@@ -2,9 +2,11 @@
  * 영화에 할당될 장르 목록 정보를 관리하는 엔티티 클래스
  * 작성이력
  * -2026-09-02: 파일 생성 및 작성
+ * -2026-09-03: BaseEntity 상속 추가
  ***/
 package com.cinema.backend.domain.movie;
 
+import com.cinema.backend.global.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,7 +15,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "movie_genres", uniqueConstraints = @UniqueConstraint(columnNames = {"movie_id", "genre_id"}))
 @NoArgsConstructor
 @Getter
-public class MovieGenre {
+public class MovieGenre extends BaseEntity {
 
     public MovieGenre(Movie movie, Genre genre) {
 

@@ -2,10 +2,12 @@
  * 예매좌석정보를 관리하는 엔티티 클래스
  * 작성이력
  * -2026-09-03: 파일 생성 및 작성
+ * -2026-09-03: BaseEntity 상속 추가
  ***/
 package com.cinema.backend.domain.reservation;
 
 import com.cinema.backend.domain.screen.Seat;
+import com.cinema.backend.global.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "reservation_seats")
 @NoArgsConstructor
 @Getter
-public class ReservationSeat {
+public class ReservationSeat extends BaseEntity {
 
     public ReservationSeat(Seat seat, Reservation reservation) {
 

@@ -2,10 +2,12 @@
  * 상영관 정보를 관리하는 엔티티 클래스
  * 작성이력
  * -2026-09-01: 파일 생성 및 작성
+ * -2026-09-03: BaseEntity 상속 추가
  ***/
 
 package com.cinema.backend.domain.screen;
 
+import com.cinema.backend.global.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "screens")
 @NoArgsConstructor
 @Getter
-public class Screen {
+public class Screen extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
