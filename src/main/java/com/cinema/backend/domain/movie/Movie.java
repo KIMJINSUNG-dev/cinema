@@ -3,6 +3,7 @@
  * 작성이력
  * -2026-09-02: 파일 생성 및 작성
  * -2026-09-03: BaseEntity 상속 추가
+ * -2026-09-08: 외부 접근 허용 메서드의 enum 파라미터를 String 기반으로 교체
  ***/
 package com.cinema.backend.domain.movie;
 
@@ -70,26 +71,52 @@ public class Movie extends BaseEntity {
         this.releaseDate = releaseDate;
     }
 
-    public void updateMovieStatus(MovieStatus movieStatus) {
+    public void updateMovieStatus(String movieStatus) {
 
-        if (movieStatus == null) {
+        if (movieStatus == null || movieStatus.isBlank()) {
 
             throw new IllegalArgumentException("영화 상태코드는 비워둘 수 없습니다.");
         }
-        this.movieStatus = movieStatus;
+
+        try {
+
+            this.movieStatus = MovieStatus.valueOf(movieStatus);
+        } catch (IllegalArgumentException e) {
+
+            throw new IllegalArgumentException("잘못된 형식의 영화 상태코드입니다: " + movieStatus);
+        }
     }
 
-    public void updateDisplayStatus(DisplayStatus displayStatus) {
+    public void updateDisplayStatus(String displayStatus) {
 
-        if (displayStatus == null) {
+        if (displayStatus == null || displayStatus.isBlank()) {
 
             throw new IllegalArgumentException("노출 상태코드는 비워둘 수 없습니다.");
         }
-        this.displayStatus = displayStatus;
+
+        try {
+
+            this.displayStatus = DisplayStatus.valueOf(displayStatus);
+        } catch (IllegalArgumentException e) {
+
+            throw new IllegalArgumentException("잘못된 형식의 노출 상태코드입니다: " + displayStatus);
+        }
     }
 
-    public void updateMovieRating(MovieRating movieRating) {
+    public void updateMovieRating(String movieRating) {
 
-        this.movieRating = movieRating;
+        if (movieRating == null || movieRating.isBlank()) {
+
+            this.movieRating = null;
+            return;
+        }
+
+        try {
+
+            this.movieRating = MovieRating.valueOf(movieRating);
+        } catch (IllegalArgumentException e) {
+
+            throw new IllegalArgumentException("잘못된 형식의 영화 등급코드입니다: " + movieRating);
+        }
     }
 }

@@ -1,0 +1,138 @@
+/***
+ * Movie.java 엔티티 데이터에 접근하는 메서드를 관리하는 서비스 클래스
+ * 작성이력
+ * -2026-09-08: 파일 생성 및 작성
+ * -2026-09-09: 영화에 종속되는 장르 구현 작업
+ ***/
+package com.cinema.backend.domain.movie;
+
+import com.cinema.backend.domain.movie.dto.MovieResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class MovieService {
+
+    private final MovieRepository movieRepository;
+    private final GenreRepository genreRepository;
+    private final MovieGenreRepository movieGenreRepository;
+
+    @Transactional
+    public MovieResponse createMovie(
+            String name,
+            LocalDate releaseDate,
+            String movieRating,
+            List<Long> genreIds) {
+
+        Movie movie = new Movie();
+
+        movie.updateName(name);
+        movie.updateReleaseDate(releaseDate);
+        movie.updateMovieRating(movieRating);
+
+        movieRepository.save(movie);
+
+        List<String> genreNames = new ArrayList<>();
+
+        if (genreIds != null && !genreIds.isEmpty()) {
+
+            for(Long genreId : genreIds) {
+
+                Genre genre = genreRepository.findById(genreId)
+                        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 장르입니다."));
+
+                MovieGenre movieGenre = new MovieGenre(movie, genre);
+                movieGenreRepository.save(movieGenre);
+                genreNames.add(genre.getName());
+            }
+        }
+
+        return new MovieResponse(movie, genreNames);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MovieResponse> findAll(Pageable pageable) {
+
+        return movieRepository.findAll(pageable)
+                .map(movie -> new MovieResponse(
+                        movie,
+                        toGenreNames(movieGenreRepository.findByMovieId(movie.getId()))
+                ));
+    }
+
+    @Transactional(readOnly = true)
+    public MovieResponse findById(Long id) {
+
+        Movie movie = movieRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 영화입니다."));
+
+        return new MovieResponse(
+                movie,
+                toGenreNames(movieGenreRepository.findByMovieId(movie.getId())));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MovieResponse> findByName(String name, Pageable pageable) {
+
+        return movieRepository.findByNameContainingIgnoreCaseAndDisplayStatus(
+                name, Movie.DisplayStatus.ACTIVE, pageable)
+            .map(movie -> new MovieResponse(
+                    movie,
+                    toGenreNames(movieGenreRepository.findByMovieId(movie.getId()))
+            ));
+    }
+
+    @Transactional
+    public MovieResponse updateMovie(
+            Long id,
+            String name,
+            LocalDate releaseDate,
+            String movieStatus,
+            String displayStatus,
+            String movieRating,
+            List<Long> genreIds) {
+
+        Movie movie = movieRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 영화입니다."));
+
+        movie.updateName(name);
+        movie.updateReleaseDate(releaseDate);
+        movie.updateMovieStatus(movieStatus);
+        movie.updateDisplayStatus(displayStatus);
+        movie.updateMovieRating(movieRating);
+
+        movieGenreRepository.deleteAll(movieGenreRepository.findByMovieId(id));
+
+        List<String> genreNames = new ArrayList<>();
+
+        if (genreIds != null && !genreIds.isEmpty()) {
+
+            for (Long genreId : genreIds) {
+
+                Genre genre = genreRepository.findById(genreId)
+                        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 장르입니다."));
+
+                MovieGenre movieGenre = new MovieGenre(movie, genre);
+                movieGenreRepository.save(movieGenre);
+                genreNames.add(genre.getName());
+            }
+        }
+
+        return new MovieResponse(movie, genreNames);
+    }
+
+    private List<String> toGenreNames(List<MovieGenre> movieGenres) {
+
+        return movieGenres.stream()
+                .map(genres -> genres.getGenre().getName())
+                .toList();
+    }
+}

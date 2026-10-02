@@ -3,6 +3,7 @@
  * 작성이력
  * -2026-09-03: 파일 생성 및 작성
  * -2026-09-03: BaseEntity 상속 추가
+ * -2026-09-10: 외부 접근 허용 메서드의 enum 파라미터를 String 기반으로 교체, 탈퇴여부 필드 추가
  ***/
 package com.cinema.backend.domain.member;
 
@@ -38,6 +39,9 @@ public class Member extends BaseEntity {
 
     @Column(nullable = false)
     private Boolean emailVerified = false;
+
+    @Column(nullable = false)
+    private Boolean isWithdrawn = false;
 
     public enum Role {
 
@@ -79,13 +83,20 @@ public class Member extends BaseEntity {
         this.nickname = nickname;
     }
 
-    public void updateRole(Role role) {
+    public void updateRole(String role) {
 
-        if (role == null) {
+        if (role == null || role.isBlank()) {
 
             throw new IllegalArgumentException("사용자 등급은 비워둘 수 없습니다.");
         }
-        this.role = role;
+
+        try {
+
+            this.role = Role.valueOf(role);
+        } catch (IllegalArgumentException e) {
+
+            throw new IllegalArgumentException("잘못된 형식의 사용자 등급코드입니다: " + role);
+        }
     }
 
     public void updateEmailVerified(Boolean emailVerified) {
@@ -95,5 +106,14 @@ public class Member extends BaseEntity {
             throw new IllegalArgumentException("이메일 인증 여부는 비워둘 수 없습니다.");
         }
         this.emailVerified = emailVerified;
+    }
+
+    public void updateIsWithdrawn(Boolean isWithdrawn) {
+
+        if (isWithdrawn == null) {
+
+            throw new IllegalArgumentException("회원탈퇴 여부는 비워둘 수 없습니다.");
+        }
+        this.isWithdrawn = isWithdrawn;
     }
 }
