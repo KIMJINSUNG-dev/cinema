@@ -110,6 +110,7 @@
 ### 1단계. Seat · SeatGrade · Showtime 마무리 (10/7 ~ 10/16)
 
 - [x] SeatController **[직접 구현]** (Seat 엔티티 보완 포함)
+- [ ] 전체 엔티티 점검: @NoArgsConstructor protected 제한, nullable 불일치 점검 **[AI 초안]** (로드맵 미표기 작업, 사전 협의로 [AI 초안] 적용)
 - [ ] SeatGrade Repository · Service · Controller **[AI 초안]**
 - [ ] Showtime 핵심 로직 **[직접 구현]**: 같은 상영관의 상영 시간 중복 검증, 종료 시각 계산
 - [ ] Showtime Controller · DTO **[AI 초안]**

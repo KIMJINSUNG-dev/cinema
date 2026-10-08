@@ -4,17 +4,19 @@
  * -2026-09-03: 파일 생성 및 작성
  * -2026-09-03: BaseEntity 상속 추가
  * -2026-09-10: 외부 접근 허용 메서드의 enum 파라미터를 String 기반으로 교체, 탈퇴여부 필드 추가
+ * -2026-10-08: 외부에서 기본 생성자로 빈 엔티티를 생성하지 못하도록 @NoArgsConstructor를 protected로 제한
  ***/
 package com.cinema.backend.domain.member;
 
 import com.cinema.backend.global.common.BaseEntity;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "members")
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 public class Member extends BaseEntity {
 
