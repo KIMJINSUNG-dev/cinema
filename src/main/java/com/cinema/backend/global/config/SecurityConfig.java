@@ -2,6 +2,7 @@
  * 보안 관련 설정을 담당하는 Configuration 클래스
  * 작성이력
  * -2026-09-14: 파일 생성 및 작성
+ * -2026-10-07: SeatController 작성에 따른 filterChain() 메서드에의 권한 체계 추가
  ***/
 package com.cinema.backend.global.config;
 
@@ -73,6 +74,18 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/screens"
+                        ).hasAnyRole("STAFF")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/screens/*"
+                        ).hasAnyRole("STAFF")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/screens/*/seats"
+                        ).hasAnyRole("STAFF")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/screens/*/seats/*"
                         ).hasAnyRole("STAFF")
                         .requestMatchers(
                                 HttpMethod.PUT,
