@@ -3,6 +3,7 @@
  * 작성이력
  * -2026-09-14: 파일 생성 및 작성
  * -2026-10-07: SeatController 작성에 따른 filterChain() 메서드에의 권한 체계 추가
+ * -2026-10-12: SeatGradeController 작성에 따른 filterChain() 메서드에의 권한 체계 추가
  ***/
 package com.cinema.backend.global.config;
 
@@ -90,6 +91,19 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.PUT,
                                 "/api/screens/**"
+                        ).hasAnyRole("MANAGER")
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/seat-grades"
+                        ).hasAnyRole("MANAGER")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/seat-grades",
+                                "/api/seat-grades/*"
+                        ).hasAnyRole("STAFF")
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/seat-grades/*"
                         ).hasAnyRole("MANAGER")
                         .requestMatchers(
                                 HttpMethod.GET,
