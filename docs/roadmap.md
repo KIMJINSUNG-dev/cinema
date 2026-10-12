@@ -110,8 +110,7 @@
 ### 1단계. Seat · SeatGrade · Showtime 마무리 (10/7 ~ 10/16)
 
 - [x] SeatController **[직접 구현]** (Seat 엔티티 보완 포함)
-- [ ] 전체 엔티티 점검: @NoArgsConstructor protected 제한, nullable 불일치 점검 **[AI 초안]** (로드맵 미표기 작업, 사전 협의로 [AI 초안] 적용)
-- [ ] SeatGrade Repository · Service · Controller **[AI 초안]**
+- [x] SeatGrade Repository · Service · Controller **[AI 초안]** (SeatGrade 엔티티 보완 · 비활성 등급 검사 포함)
 - [ ] Showtime 핵심 로직 **[직접 구현]**: 같은 상영관의 상영 시간 중복 검증, 종료 시각 계산
 - [ ] Showtime Controller · DTO **[AI 초안]**
 - [ ] SecurityConfig에 신규 엔드포인트 권한 반영
@@ -234,3 +233,4 @@ PG 연동 전에 완료해야 하는 단계입니다.
 | 2026-10-02 | 일정 내 공휴일 명시(10/5 개천절 대체공휴일 확인) |
 | 2026-10-02 | 0단계 완료 |
 | 2026-10-08 | SeatController 완료, Seat 엔티티 보완(유니크 제약 · 생성자 · 행 코드 검증) |
+| 2026-10-12 | SeatGrade API 완료(첫 [AI 초안] 신규 기능 작업) |
