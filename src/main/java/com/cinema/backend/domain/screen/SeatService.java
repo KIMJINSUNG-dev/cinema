@@ -10,6 +10,7 @@
  * -2026-10-07: DTO 객체 및 컨트롤러에서의 요청 편의를 위해 row 파라미터를 String 타입으로 변경,
  *              각 메서드 내부에서 직접 문자열 검사 및 char로 변환
  * -2026-10-07: updateSeat() 메서드의 중복 검사를 엔티티 변경 전, 새 위치 기준으로 수행하도록 변경
+ * -2026-10-12: createSeat(), updateSeat() 메서드에 좌석등급 활성화 여부 검사 추가
  ***/
 package com.cinema.backend.domain.screen;
 
@@ -53,6 +54,11 @@ public class SeatService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상영관입니다."));
         SeatGrade seatGrade = seatGradeRepository.findById(seatGradeId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 좌석등급입니다."));
+
+        if (!seatGrade.isActive()) {
+
+            throw new IllegalArgumentException("사용할 수 없는 좌석등급입니다.");
+        }
 
         if (row == null || row.length() != 1) {
 
@@ -145,18 +151,27 @@ public class SeatService {
         SeatGrade seatGrade = seatGradeRepository.findById(seatGradeId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 좌석등급입니다."));
 
+        if (!seat.getSeatGrade().getId().equals(seatGrade.getId()) && !seatGrade.isActive()) {
+
+            throw new IllegalArgumentException("사용할 수 없는 좌석등급입니다.");
+        }
+
         if (!seat.getScreen().getId().equals(screenId)) {
 
             throw new IllegalArgumentException("상영관 정보와 좌석 정보가 일치하지 않습니다.");
         }
+
         if (row == null || row.length() != 1) {
 
             throw new IllegalArgumentException("잘못된 행 코드입니다.");
         }
 
         Seat existing = seatRepository.findSeatByRowAndColumnAndScreen(toRowNum(row.charAt(0)), column, seat.getScreen());
-        if (existing != null && !existing.getId().equals(seat.getId()))
+
+        if (existing != null && !existing.getId().equals(seat.getId())) {
+
             throw new IllegalArgumentException("이미 사용중인 좌석코드입니다.");
+        }
 
         seat.updateSeatCode(row.charAt(0), column);
         seat.updateSeatGrade(seatGrade);
