@@ -3,6 +3,7 @@
  * 작성이력
  * -2026-09-08: 파일 생성 및 작성
  * -2026-09-09: 영화에 종속되는 장르 구현 업데이트
+ * -2026-10-14: runningTime 필드 추가 및 생성자에 반영
  ***/
 package com.cinema.backend.domain.movie.dto;
 
@@ -22,6 +23,7 @@ public class MovieResponse {
     private Movie.DisplayStatus displayStatus;
     private Movie.MovieRating movieRating;
     private List<String> genreNames;
+    private Integer runningTime;
 
     public MovieResponse(Movie movie, List<String> genreNames) {
 
@@ -32,5 +34,6 @@ public class MovieResponse {
         this.displayStatus = movie.getDisplayStatus();
         this.movieRating = movie.getMovieRating();
         this.genreNames = genreNames;
+        this.runningTime = movie.getRunningTime();
     }
 }

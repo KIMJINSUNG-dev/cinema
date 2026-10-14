@@ -3,6 +3,7 @@
  * 작성이력
  * -2026-09-08: 파일 생성 및 작성
  * -2026-09-09: 영화에 종속되는 장르 구현 작업
+ * -2026-10-14: createMovie(), updateMovie() 메서드에 runningTime 반영
  ***/
 package com.cinema.backend.domain.movie;
 
@@ -34,7 +35,8 @@ public class MovieController {
                 request.getName(),
                 request.getReleaseDate(),
                 request.getMovieRating(),
-                request.getGenreIds()
+                request.getGenreIds(),
+                request.getRunningTime()
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -76,7 +78,8 @@ public class MovieController {
                         request.getMovieStatus(),
                         request.getDisplayStatus(),
                         request.getMovieRating(),
-                        request.getGenreIds()
+                        request.getGenreIds(),
+                        request.getRunningTime()
                 )
         );
     }

@@ -5,6 +5,7 @@
  * -2026-09-03: BaseEntity 상속 추가
  * -2026-09-08: 외부 접근 허용 메서드의 enum 파라미터를 String 기반으로 교체
  * -2026-10-08: 외부에서 기본 생성자로 빈 엔티티를 생성하지 못하도록 @NoArgsConstructor를 protected로 제한
+ * -2026-10-14: runningTime 필드 및 updateRunningTime() 메서드 추가
  ***/
 package com.cinema.backend.domain.movie;
 
@@ -43,6 +44,9 @@ public class Movie extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column
     private MovieRating movieRating;
+
+    @Column
+    private Integer runningTime;
 
     public enum MovieStatus {
 
@@ -120,5 +124,20 @@ public class Movie extends BaseEntity {
 
             throw new IllegalArgumentException("잘못된 형식의 영화 등급코드입니다: " + movieRating);
         }
+    }
+
+    public void updateRunningTime(Integer runningTime) {
+
+        if (runningTime == null) {
+
+            this.runningTime = null;
+            return;
+        }
+
+        if (runningTime <= 0) {
+
+            throw new IllegalArgumentException("러닝타임은 0분 이하일 수 없습니다.");
+        }
+        this.runningTime = runningTime;
     }
 }

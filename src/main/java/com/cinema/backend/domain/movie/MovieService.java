@@ -3,6 +3,7 @@
  * 작성이력
  * -2026-09-08: 파일 생성 및 작성
  * -2026-09-09: 영화에 종속되는 장르 구현 작업
+ * -2026-10-14: createMovie(), updateMovie() 메서드에 runningTime 반영
  ***/
 package com.cinema.backend.domain.movie;
 
@@ -30,13 +31,15 @@ public class MovieService {
             String name,
             LocalDate releaseDate,
             String movieRating,
-            List<Long> genreIds) {
+            List<Long> genreIds,
+            Integer runningTime) {
 
         Movie movie = new Movie();
 
         movie.updateName(name);
         movie.updateReleaseDate(releaseDate);
         movie.updateMovieRating(movieRating);
+        movie.updateRunningTime(runningTime);
 
         movieRepository.save(movie);
 
@@ -98,7 +101,8 @@ public class MovieService {
             String movieStatus,
             String displayStatus,
             String movieRating,
-            List<Long> genreIds) {
+            List<Long> genreIds,
+            Integer runningTime) {
 
         Movie movie = movieRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 영화입니다."));
@@ -108,6 +112,7 @@ public class MovieService {
         movie.updateMovieStatus(movieStatus);
         movie.updateDisplayStatus(displayStatus);
         movie.updateMovieRating(movieRating);
+        movie.updateRunningTime(runningTime);
 
         movieGenreRepository.deleteAll(movieGenreRepository.findByMovieId(id));
 
