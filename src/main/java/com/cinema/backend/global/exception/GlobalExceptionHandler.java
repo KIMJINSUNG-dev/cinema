@@ -3,9 +3,10 @@
  * 작성이력
  * -2026-09-10: 파일 생성 및 작성
  * -2026-09-14: handleException() 메서드에 오류 검증 코드 추가
- * -2026-10-15: 요청 본문 파싱 실패 · 필수 파라미터 누락 · 파라미터 타입 불일치를
- *              400으로 처리하는 핸들러 추가 (ShowtimeController의 @RequestParam screenId 등에서 발생 가능)
+ * -2026-10-15: 요청 본문 파싱 실패 · 필수 파라미터 누락 · 파라미터 타입 불일치를 400으로 처리하는 핸들러 추가
+ *              (ShowtimeController의 @RequestParam screenId 등에서 발생 가능)
  *              내부 예외 클래스명·스택은 로그로만 남기고 응답 본문에는 노출하지 않음
+ * -2026-10-15: AccessDeniedException 핸들러 추가
  ***/
 package com.cinema.backend.global.exception;
 
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -47,6 +49,12 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body("요청 파라미터의 형식이 올바르지 않습니다: " + e.getName());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<String> handleAccessDeniedException(AccessDeniedException e) {
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body("권한이 없습니다.");
     }
 
     @ExceptionHandler(Exception.class)

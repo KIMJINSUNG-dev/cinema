@@ -5,6 +5,7 @@
  * -2026-10-07: SeatController 작성에 따른 filterChain() 메서드에의 권한 체계 추가
  * -2026-10-12: SeatGradeController 작성에 따른 filterChain() 메서드에의 권한 체계 추가
  * -2026-10-15: ShowtimeController 작성에 따른 filterChain() 메서드에의 권한 체계 추가
+ * -2026-10-15: filterChain() 메서드 권한 처리를 denyAll() 기반으로 재정비
  ***/
 package com.cinema.backend.global.config;
 
@@ -51,6 +52,9 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                "/error"
+                        ).permitAll()
+                        .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/members",
                                 "/api/auths/login",
@@ -62,61 +66,43 @@ public class SecurityConfig {
                                 "/api/movies/*"
                         ).permitAll()
                         .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/movies/**"
-                        ).hasAnyRole("MANAGER")
-                        .requestMatchers(
-                                HttpMethod.PUT,
-                                "/api/movies/**"
-                        ).hasAnyRole("MANAGER")
+                                HttpMethod.GET,
+                                "/api/members/myinfo"
+                        ).hasAnyRole("CUSTOMER")
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/api/screens/**"
-                        ).hasAnyRole("MANAGER")
+                                "/api/auths/logout"
+                        ).hasAnyRole("CUSTOMER")
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/members/*/nickname",
+                                "/api/members/*/withdraw"
+                        ).hasAnyRole("CUSTOMER")
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/api/screens"
+                                "/api/screens/**",
+                                "/api/seat-grades/**",
+                                "/api/showtimes/**",
+                                "/api/members/*",
+                                "/api/members/by-email/*",
+                                "/api/members/by-nickname/*"
                         ).hasAnyRole("STAFF")
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/api/screens/*"
-                        ).hasAnyRole("STAFF")
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/screens/*/seats"
-                        ).hasAnyRole("STAFF")
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/screens/*/seats/*"
-                        ).hasAnyRole("STAFF")
-                        .requestMatchers(
-                                HttpMethod.PUT,
-                                "/api/screens/**"
-                        ).hasAnyRole("MANAGER")
+                                "/api/members"
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/api/seat-grades"
-                        ).hasAnyRole("MANAGER")
-                        .requestMatchers(
-                                HttpMethod.GET,
+                                "/api/movies",
+                                "/api/screens/**",
                                 "/api/seat-grades",
-                                "/api/seat-grades/*"
-                        ).hasAnyRole("STAFF")
-                        .requestMatchers(
-                                HttpMethod.PUT,
-                                "/api/seat-grades/*"
-                        ).hasAnyRole("MANAGER")
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/showtimes",
-                                "/api/showtimes/*"
-                        ).hasAnyRole("STAFF")
-                        .requestMatchers(
-                                HttpMethod.POST,
                                 "/api/showtimes"
                         ).hasAnyRole("MANAGER")
                         .requestMatchers(
                                 HttpMethod.PUT,
+                                "/api/movies/*",
+                                "/api/screens/**",
+                                "/api/seat-grades/*",
                                 "/api/showtimes/*"
                         ).hasAnyRole("MANAGER")
                         .requestMatchers(
@@ -124,31 +110,10 @@ public class SecurityConfig {
                                 "/api/showtimes/*/status"
                         ).hasAnyRole("MANAGER")
                         .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/members/by-email/*",
-                                "/api/members/by-nickname/*"
-                        ).hasAnyRole("STAFF")
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/members/myinfo"
-                        ).hasAnyRole("CUSTOMER")
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/members/*"
-                        ).hasAnyRole("STAFF")
-                        .requestMatchers(
-                                HttpMethod.PATCH,
-                                "/api/members/**"
-                        ).hasAnyRole("CUSTOMER")
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/auths/logout"
-                        ).hasAnyRole("CUSTOMER")
-                        .requestMatchers(
                                 HttpMethod.PUT,
                                 "/api/members/*"
-                        ).hasAnyRole("ADMIN")
-                        .anyRequest().authenticated()
+                        ).hasRole("ADMIN")
+                        .anyRequest().denyAll()
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
