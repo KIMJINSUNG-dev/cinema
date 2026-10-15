@@ -2,6 +2,7 @@
  * Showtime.java 엔티티 데이터에 접근하는 메서드를 관리하는 서비스 클래스
  * 작성이력
  * -2026-10-14: 파일 생성 및 작성
+ * -2026-10-15: updateShowtimeStatus() 메서드 추가
  ***/
 package com.cinema.backend.domain.showtime;
 
@@ -73,6 +74,21 @@ public class ShowtimeService {
         validateNoOverlap(showtime.getScreen(), showtimeId, startTime, endTime);
 
         showtime.updateSchedule(startTime);
+        return new ShowtimeResponse(showtime);
+    }
+
+    @Transactional
+    public ShowtimeResponse updateShowtimeStatus(Long showtimeId, String showtimeStatus) {
+
+        if (showtimeId == null) {
+
+            throw new IllegalArgumentException("잘못된 상영정보입니다.");
+        }
+
+        Showtime showtime = showtimeRepository.findById(showtimeId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상영정보입니다."));
+
+        showtime.updateShowtimeStatus(showtimeStatus);
         return new ShowtimeResponse(showtime);
     }
 

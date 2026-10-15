@@ -8,6 +8,7 @@
  *              리워크 과정에서 스태틱 메서드 calcEndTime() 메서드 추가
  * -2026-10-14: updateScreen(), updateMovie() 메서드 논리를 생성자 내부로 이관 및 기존 메서드 삭제
  * -2026-10-14: 활성화 여부를 boolean에서 enum으로 변경
+ * -2026-10-15: updateShowtimeStatus()에 ACTIVE로 변환 시 검사 조건 추가
  ***/
 package com.cinema.backend.domain.showtime;
 
@@ -106,13 +107,40 @@ public class Showtime extends BaseEntity {
             throw new IllegalArgumentException("상영정보상태는 비워둘 수 없습니다.");
         }
 
+        ShowtimeStatus status;
+
         try {
 
-            this.showtimeStatus = ShowtimeStatus.valueOf(showtimeStatus);
+            status = ShowtimeStatus.valueOf(showtimeStatus);
         } catch (IllegalArgumentException e) {
 
             throw new IllegalArgumentException("잘못된 형식의 상영정보 상태코드입니다: " + showtimeStatus);
         }
+
+        if (status == ShowtimeStatus.ACTIVE) {
+
+            if (movie.getDisplayStatus() != Movie.DisplayStatus.ACTIVE) {
+
+                throw new IllegalArgumentException("비공개상태인 영화의 상영정보는 활성화할 수 없습니다.");
+            }
+
+            if (screen.getActiveStatus() != Screen.ActiveStatus.ACTIVE) {
+
+                throw new IllegalArgumentException("비활성화상태인 상영관의 상영정보는 활성화할 수 없습니다.");
+            }
+
+            if (movie.getMovieStatus() == Movie.MovieStatus.ENDED) {
+
+                throw new IllegalArgumentException("상영종료된 영화의 상영정보는 활성화할 수 없습니다.");
+            }
+
+            if (startTime.isBefore(LocalDateTime.now())) {
+
+                throw new IllegalArgumentException("시작시각이 지난 상영정보는 활성화할 수 없습니다.");
+            }
+        }
+
+        this.showtimeStatus = status;
     }
 
     public static LocalDateTime calcEndTime(LocalDateTime startTime, Movie movie) {
