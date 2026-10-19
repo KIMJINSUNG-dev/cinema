@@ -1,6 +1,6 @@
 # Cinema 설계 결정 기록
 
-> 최초 작성: 2026-10-01 · 최종 수정: 2026-10-16
+> 최초 작성: 2026-10-01 · 최종 수정: 2026-10-19
 
 Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 새 결정이 생기거나 기존 결정이 바뀌면 이 문서에 추가하고, 바뀐 결정은 지우지 않고 변경 내역을 남깁니다.
@@ -261,6 +261,12 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
   - 채용공고에서 자주 요구하는 Docker를 실제로 써 보는 기회가 된다.
 - **검토한 대안**: H2 인메모리 DB, 로컬 MySQL의 별도 테스트 스키마.
 - **준비 (2026-10-16)**: Docker Desktop(WSL2) 설치, `hello-world` 실행 확인, `mysql:8.0` 이미지 미리 받음.
+- **구현 메모 (2026-10-19)**: 
+  - 테스트 의존성: `spring-boot-testcontainers`, `org.testcontainers:testcontainers-junit-jupiter`, `org.testcontainers:testcontainers-mysql`. Testcontainers 2.0부터 모듈 이름에 `testcontainers-` 접두사가 붙고, `MySQLContainer` 패키지가 `org.testcontainers.mysql`로 바뀌었다. 버전은 Spring Boot가 관리하므로 적지 않는다.
+  - 컨테이너는 `@TestConfiguration`의 `@Bean` + `@ServiceConnection`으로 선언하고, 테스트 클래스에서 `@Import`로 불러온다. 테스트 클래스의 `static @Container` 필드 방식은 클래스가 끝날 때마다 컨테이너를 멈춰 Spring 테스트 컨텍스트 캐시와 어긋날 수 있어 쓰지 않는다.
+  - `@ServiceConnection`의 접속 정보가 `spring.datasource.*`보다 우선하므로 `application.properties`는 바꾸지 않는다. 테스트용 접속 정보를 어디에도 값으로 적지 않는다.
+- **검증 (2026-10-19)**: `contextLoads`가 3306이 아닌 무작위 포트와 `test` DB로 접속해 통과했다.
+- **남은 과제**: GitHub Actions에는 `CINEMA_JWT_SECRET` 등 환경변수가 없으므로 CI 구성 시 처리한다.
 
 ---
 
@@ -275,3 +281,4 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 | 2026-10-14 | 상영 일정 결정 D-29 ~ D-32 추가 |
 | 2026-10-15 | D-33 ~ D-35 추가, D-14 · D-25 보완 |
 | 2026-10-16 | 테스트 DB 결정 D-36 추가 |
+| 2026-10-19 | D-36에 구현 메모 · 검증 결과 추가 |
