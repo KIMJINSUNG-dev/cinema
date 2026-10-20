@@ -2,6 +2,8 @@
  * Screen.java 엔티티 데이터에 접근하는 메서드를 관리하는 서비스 클래스
  * 작성이력
  * -2026-09-05: 파일 생성 및 작성
+ * -2026-10-20: Screen.java의 updateActiveStatus() 메서드 구조 변경에 따른
+ *              updateScreen() 메서드에서의 인자 입력 방식 변경
  ***/
 package com.cinema.backend.domain.screen;
 
@@ -53,7 +55,7 @@ public class ScreenService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상영관입니다."));
 
         screen.updateName(name);
-        screen.updateActiveStatus(Screen.ActiveStatus.valueOf(status));
+        screen.updateActiveStatus(status);
 
         return new ScreenResponse(screen);
     }
