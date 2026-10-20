@@ -1,6 +1,6 @@
 # Cinema 설계 결정 기록
 
-> 최초 작성: 2026-10-01 · 최종 수정: 2026-10-19
+> 최초 작성: 2026-10-01 · 최종 수정: 2026-10-20
 
 Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 새 결정이 생기거나 기존 결정이 바뀌면 이 문서에 추가하고, 바뀐 결정은 지우지 않고 변경 내역을 남깁니다.
@@ -248,6 +248,7 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 - **결정**: `GlobalExceptionHandler`에 다음 처리기를 둔다. 요청 본문 파싱 실패(`HttpMessageNotReadableException`), 필수 파라미터 누락(`MissingServletRequestParameterException`), 파라미터 타입 불일치(`MethodArgumentTypeMismatchException`)는 400, 서비스의 소유권 위반(`org.springframework.security.access.AccessDeniedException`)은 403. 응답에는 예외 클래스명이나 스택을 노출하지 않는다.
 - **근거**: `@ExceptionHandler(Exception.class)`가 모든 예외를 잡기 때문에, Spring이 원래 400이나 403으로 처리하던 예외까지 500이 되고 있었다. 권한 위반을 400(IllegalArgumentException)으로 바꾸면 클라이언트가 "입력이 잘못됐다"고 오해하므로 403을 유지한다.
 - **주의**: `AccessDeniedException`은 `java.nio.file` 패키지에도 같은 이름의 클래스가 있다. IDE 자동 import 시 Spring Security 쪽인지 확인한다.
+- **보완 (2026-10-20)**: `ScreenService.updateScreen()`이 `Screen.ActiveStatus.valueOf(status)`를 그대로 호출해, 상태가 null이면 `NullPointerException`으로 500이 되고 잘못된 값이면 Java 기본 메시지가 노출되던 문제를 수정했다. `Screen.updateActiveStatus()`가 String을 받아 null·공백 검사 후 `valueOf`만 try/catch로 감싸 400으로 응답한다. String으로 상태값을 받는 다른 엔티티(Movie, Seat, SeatGrade, Showtime)와 같은 방식이다.
 
 ## 10. 테스트
 
@@ -268,6 +269,25 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 - **검증 (2026-10-19)**: `contextLoads`가 3306이 아닌 무작위 포트와 `test` DB로 접속해 통과했다.
 - **남은 과제**: GitHub Actions에는 `CINEMA_JWT_SECRET` 등 환경변수가 없으므로 CI 구성 시 처리한다.
 
+### D-37. 통합 테스트 작성 규칙
+
+- **결정**: 서비스 단위 통합 테스트는 다음 규칙으로 작성한다.
+  1. 클래스에 `@Import(TestcontainersConfiguration.class)` + `@SpringBootTest` + `@Transactional`을 붙인다. `@Transactional`은 테스트마다 DB 변경을 롤백해 테스트끼리 영향을 주지 않게 한다.
+  2. 테스트 데이터는 리포지토리나 `new`가 아니라 **실제 서비스 메서드**로 만든다. 운영과 같은 검증을 거친 데이터로 테스트하기 위해서다.
+  3. 날짜는 먼 미래(2099년)를 쓴다. 엔티티가 `LocalDateTime.now()`로 과거 시각을 거부하기 때문이다. Clock 주입은 필요해질 때 검토한다.
+  4. 테스트 메서드 하나는 시나리오 하나만 검증하고, 의도는 한국어 `@DisplayName`으로 드러낸다.
+  5. 거부 검증은 `assertThatThrownBy` + `isInstanceOf` + `hasMessageContaining`으로 **예외 종류와 거부 이유(메시지)**까지 확인한다. 같은 예외라도 다른 이유로 거부되면 의도한 검증이 아니기 때문이다.
+  6. 성공 검증은 예외가 없는 것만 보지 않고 반환된 값(바뀐 상태, 시각 등)까지 확인한다.
+  7. 새 테스트는 기대값을 일부러 바꿔 **실패하는 것을 한 번 확인**한다. 항상 통과하는 테스트는 검증하지 않는 테스트일 수 있다.
+  8. 예외 메시지를 로그로 출력하지 않는다. 판정은 assertion이 하고, 실패 시에는 AssertJ가 실제 값을 보여준다.
+- **근거**: 
+  - `Movie`·`Screen`은 기본 생성자가 `protected`라 다른 패키지의 테스트에서 직접 만들 수 없다. 필수값 생성자를 추가하는 대신(보류 항목) 서비스로 만드는 방식을 택했고, 이것이 실제 생성 흐름(상영관 생성 → 상태 변경 등)을 그대로 검증하는 이점도 있다.
+  - AI 초안 테스트는 개발자가 작성한 체크리스트로 리뷰한다. AI가 테스트를 통과시키려고 기대값이나 운영 코드를 바꾸지 않도록, 실패 시에는 고치지 말고 보고하게 한다.
+- **적용 (2026-10-20)**: 
+  - `ShowtimeOverlapTest` 7개 [직접 구현]: 경계값(10:45 허용 / 10:46 거부, 15:15 허용 / 15:14 거부), 완전 겹침, 다른 상영관, 수정 시 자기 자신 제외(D-30).
+  - `SeatRegressionTest` 8개, `SeatGradeRegressionTest` 4개 [AI 초안]: 좌석 코드 중복, 자동 flush 버그, 소문자 행 코드 변환 순서, 비활성 등급(D-27), 등급명 trim·대소문자 중복(D-28).
+  - 대소문자만 다른 등급명이 중복으로 거부되는 테스트(D-28)는 Java 코드가 아니라 MySQL 정렬 규칙에 의존한다. 컨테이너 DB에서 통과한 것으로 D-36의 판단(H2 대신 실제 MySQL)을 확인했다.
+
 ---
 
 ## 변경 이력
@@ -282,3 +302,4 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 | 2026-10-15 | D-33 ~ D-35 추가, D-14 · D-25 보완 |
 | 2026-10-16 | 테스트 DB 결정 D-36 추가 |
 | 2026-10-19 | D-36에 구현 메모 · 검증 결과 추가 |
+| 2026-10-20 | 통합 테스트 작성 규칙 D-37 추가, D-35 보완(상영관 상태 변경 400 처리) |
