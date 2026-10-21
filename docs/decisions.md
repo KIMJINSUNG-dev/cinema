@@ -1,6 +1,6 @@
 # Cinema 설계 결정 기록
 
-> 최초 작성: 2026-10-01 · 최종 수정: 2026-10-20
+> 최초 작성: 2026-10-01 · 최종 수정: 2026-10-21
 
 Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 새 결정이 생기거나 기존 결정이 바뀌면 이 문서에 추가하고, 바뀐 결정은 지우지 않고 변경 내역을 남깁니다.
@@ -288,6 +288,22 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
   - `SeatRegressionTest` 8개, `SeatGradeRegressionTest` 4개 [AI 초안]: 좌석 코드 중복, 자동 flush 버그, 소문자 행 코드 변환 순서, 비활성 등급(D-27), 등급명 trim·대소문자 중복(D-28).
   - 대소문자만 다른 등급명이 중복으로 거부되는 테스트(D-28)는 Java 코드가 아니라 MySQL 정렬 규칙에 의존한다. 컨테이너 DB에서 통과한 것으로 D-36의 판단(H2 대신 실제 MySQL)을 확인했다.
 
+
+## 11. CI
+
+### D-38. CI(GitHub Actions)는 통합 테스트까지 실행, 민감 정보는 Repository secret으로 전달
+
+- **결정**: 
+  - GitHub Actions는 push 시 `gradlew test`로 **모든 테스트**를 실행한다. 로드맵의 "CI 1단계는 단위 테스트, 통합 테스트는 3단계"를 앞당겨, Testcontainers 통합 테스트를 2단계부터 CI에 포함한다.
+  - `CINEMA_JWT_SECRET`은 GitHub 레포의 **Repository secret**으로 등록하고 workflow에서 환경변수로 넘긴다. CI용 값은 로컬 값과 다른, 새로 만든 무작위 값(64바이트, Base64)을 쓴다.
+- **근거**: 
+  - 현재 테스트 20개가 모두 통합 테스트라, 계획대로 단위 테스트만 돌리면 CI에서 실행할 테스트가 없다. GitHub Actions의 `ubuntu-latest` runner에는 Docker가 있어 Testcontainers를 그대로 쓸 수 있다.
+  - `gradlew test`는 종류와 관계없이 `src/test`의 테스트를 모두 실행하므로, 이후 단위 테스트가 추가돼도 설정을 바꿀 필요가 없다.
+  - runner는 매번 새로 만들어지는 서버라 로컬 Windows 환경변수가 없다. 테스트 전용 설정 파일에 가짜 값을 적는 방식(검토한 대안)은 레포에 값이 남아 D-03 · CLAUDE.md 보안 규칙과 충돌할 소지가 있다.
+  - Environment secret은 배포 환경별 값 분리와 승인 규칙용이라, 테스트만 하는 CI에는 Repository secret이 맞다. 배포(CD)를 붙일 때 다시 검토한다.
+- **검토한 대안**: 단위 테스트만 CI에서 실행(로드맵 원안), `src/test/resources` 테스트 설정 파일에 가짜 secret 기재.
+- **준비 (2026-10-21)**: 백엔드 레포에 Repository secret `CINEMA_JWT_SECRET` 등록. `CINEMA_DB_PASSWORD`는 `@ServiceConnection`이 접속 정보를 덮어쓰므로 등록하지 않고, 첫 실행 결과를 보고 판단한다.
+
 ---
 
 ## 변경 이력
@@ -303,3 +319,4 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 | 2026-10-16 | 테스트 DB 결정 D-36 추가 |
 | 2026-10-19 | D-36에 구현 메모 · 검증 결과 추가 |
 | 2026-10-20 | 통합 테스트 작성 규칙 D-37 추가, D-35 보완(상영관 상태 변경 400 처리) |
+| 2026-10-21 | CI 결정 D-38 추가 |
