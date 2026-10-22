@@ -49,6 +49,7 @@ public class Reservation extends BaseEntity {
     private Showtime showtime;
 
     @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
     private ReservationStatus reservationStatus = ReservationStatus.PENDING;
 
     public enum ReservationStatus {
