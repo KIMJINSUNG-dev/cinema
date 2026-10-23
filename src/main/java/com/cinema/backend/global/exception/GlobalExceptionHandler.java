@@ -7,6 +7,7 @@
  *              (ShowtimeController의 @RequestParam screenId 등에서 발생 가능)
  *              내부 예외 클래스명·스택은 로그로만 남기고 응답 본문에는 노출하지 않음
  * -2026-10-15: AccessDeniedException 핸들러 추가
+ * -2026-10-23: IllegalStateException 핸들러 추가
  ***/
 package com.cinema.backend.global.exception;
 
@@ -28,6 +29,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException e) {
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<String> handleIllegalStateException(IllegalStateException e) {
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

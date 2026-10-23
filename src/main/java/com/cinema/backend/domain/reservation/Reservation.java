@@ -4,6 +4,10 @@
  * -2026-09-03: 파일 생성 및 작성
  * -2026-09-03: BaseEntity 상속 추가
  * -2026-10-08: 외부에서 기본 생성자로 빈 엔티티를 생성하지 못하도록 @NoArgsConstructor를 protected로 제한
+ * -2026-10-23: updateReservationStatus() 메서드를
+ *              개별 상태 변환 메서드(confirm(), cancel(), expire())
+ *              + 전이 검사 공통 메서드(validateTransition()) 방식으로 리워크,
+ *              리워크 과정에서 ReservationStatus에 한국어 label 추가(예외 메시지 출력용)
  ***/
 package com.cinema.backend.domain.reservation;
 
@@ -14,6 +18,9 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "reservations")
@@ -61,15 +68,55 @@ public class Reservation extends BaseEntity {
          * CANCELED: 예매취소(회원이 직접 취소)
          * EXPIRED: 예매취소(PENDING 상태에서 선점 시간초과로 자동 취소)
          ***/
-        PENDING, CONFIRMED, CANCELED, EXPIRED
+        PENDING("결제 대기"),
+        CONFIRMED("예매 완료"),
+        CANCELED("취소"),
+        EXPIRED("만료");
+
+        private final String label;
+
+        ReservationStatus(String label) {
+
+            this.label = label;
+        }
+
+        public String getLabel() {
+
+            return label;
+        }
     }
 
-    public void updateReservationStatus(ReservationStatus reservationStatus) {
+    public void confirm() {
 
-        if (reservationStatus == null) {
+        validateTransition("확정", EnumSet.of(ReservationStatus.PENDING));
+        this.reservationStatus = ReservationStatus.CONFIRMED;
+    }
 
-            throw new IllegalArgumentException("예약상태는 비워둘 수 없습니다.");
+    public void cancel() {
+
+        validateTransition("취소", EnumSet.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED));
+        this.reservationStatus = ReservationStatus.CANCELED;
+        // TODO: 예약 좌석 활성 표시 해제
+    }
+
+    public void expire() {
+
+        validateTransition("만료 처리", EnumSet.of(ReservationStatus.PENDING));
+        this.reservationStatus = ReservationStatus.EXPIRED;
+        // TODO: 예약 좌석 활성 표시 해제
+    }
+
+    private void validateTransition(String action, Set<ReservationStatus> allowedFrom) {
+
+        if (!allowedFrom.contains(this.reservationStatus)) {
+
+            throw new IllegalStateException(
+                    String.format(
+                            "%s 상태의 예약은 %s할 수 없습니다.",
+                            this.reservationStatus.getLabel(),
+                            action
+                    )
+            );
         }
-        this.reservationStatus = reservationStatus;
     }
 }
