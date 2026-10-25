@@ -1,6 +1,6 @@
 # Cinema 설계 결정 기록
 
-> 최초 작성: 2026-10-01 · 최종 수정: 2026-10-23
+> 최초 작성: 2026-10-01 · 최종 수정: 2026-10-25
 
 Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 새 결정이 생기거나 기존 결정이 바뀌면 이 문서에 추가하고, 바뀐 결정은 지우지 않고 변경 내역을 남깁니다.
@@ -255,7 +255,12 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 - **주의**: `AccessDeniedException`은 `java.nio.file` 패키지에도 같은 이름의 클래스가 있다. IDE 자동 import 시 Spring Security 쪽인지 확인한다.
 - **보완 (2026-10-20)**: `ScreenService.updateScreen()`이 `Screen.ActiveStatus.valueOf(status)`를 그대로 호출해, 상태가 null이면 `NullPointerException`으로 500이 되고 잘못된 값이면 Java 기본 메시지가 노출되던 문제를 수정했다. `Screen.updateActiveStatus()`가 String을 받아 null·공백 검사 후 `valueOf`만 try/catch로 감싸 400으로 응답한다. String으로 상태값을 받는 다른 엔티티(Movie, Seat, SeatGrade, Showtime)와 같은 방식이다.
 - **보완 예정 (2026-10-22 결정, 3단계 구현)**: DB 제약 위반(`DataIntegrityViolationException`)은 현재 500이 된다. 처리기를 추가해 **409 Conflict**("이미 존재하는 데이터와 충돌합니다")로 응답한다. 요청 형식은 올바르지만 현재 상태와 충돌한다는 의미라 400보다 정확하다. 예약 좌석 유니크 제약(D-40)뿐 아니라, 서비스 검사를 동시에 통과한 좌석 코드 · 등급명 중복에도 적용된다.
-- **현재 상태 (2026-10-23)**: 예약 상태 전이 실패를 409로 응답하기 위해 `IllegalStateException` → 409 처리기를 추가해 커밋했다. 그러나 `IllegalStateException`은 Spring · Hibernate · Java 라이브러리도 내부 오류에 쓰므로, 이대로면 진짜 서버 버그가 로그 없이 409로 응답되고 내부 메시지가 노출된다. 3단계에서 **우리가 의도해 던지는 충돌만 나타내는 전용 예외(`ConflictException`)**를 만들어 409로 처리하고, 일반 `IllegalStateException`은 다시 500 처리기로 보낸다. "이미 예약된 좌석"(D-39), "예약이 있는 상영 일정의 변경"(D-44)도 같은 예외를 쓴다. 기존 `IllegalArgumentException` → 400 처리기에도 같은 위험이 있으며, 보류 항목인 예외 체계 정비 때 다룬다.
+- **구현 (2026-10-25, 상태 충돌)**: `global.exception.ConflictException`(`RuntimeException` 상속)을 추가하고, `GlobalExceptionHandler`는 이 예외만 409로 응답한다. 10/23에 커밋했던 `IllegalStateException` → 409 처리기는 삭제했다.
+  - 이유: `IllegalStateException`은 Spring · Hibernate · Java 라이브러리도 내부 오류에 쓰므로, 이를 409로 받으면 진짜 서버 버그가 로그 없이 "충돌"로 숨겨지고 내부 메시지가 노출된다. 이제 라이브러리의 `IllegalStateException`은 `Exception` 처리기(500 + `log.error`)로 간다.
+  - `RuntimeException`을 상속한 이유: 체크 예외는 모든 호출 경로에 `throws`가 퍼지고, `@Transactional`은 기본적으로 언체크 예외에서만 롤백하므로 체크 예외로 만들면 충돌이 나도 변경이 커밋된다(D-42의 전체 롤백이 깨짐). `IllegalStateException`을 상속하지 않은 이유는 다른 곳에서 `IllegalStateException`을 잡을 때 함께 잡혀 분리 목적이 흐려지기 때문이다.
+  - `ConflictException`의 메시지는 직접 쓴 한국어 문장이라 응답에 노출해도 D-35 원칙에 어긋나지 않는다. 예외는 "충돌"이라는 의미만 가지고 HTTP 변환은 처리기가 맡아, 엔티티가 웹 계층을 알지 않는다.
+  - "이미 예약된 좌석"(D-39), "예약이 있는 상영 일정의 변경"(D-44)도 이 예외를 쓴다. DB 제약 위반(`DataIntegrityViolationException`) → 409는 유니크 제약이 생기는 예약 좌석 작업 이후 추가한다.
+  - `IllegalArgumentException` → 400 처리기에도 라이브러리 예외를 그대로 노출하는 같은 위험이 있다. 우리 코드의 사용처가 수십 곳이라, 보류 항목인 예외 체계 정비(입력 오류 400 · 리소스 없음 404 전용 예외 도입) 때 함께 교체한다. `ConflictException`이 그 본보기다.
 
 ## 10. 테스트
 
@@ -397,7 +402,12 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
   - `handledBy` 덕분에 회원 대리 예약에서도 처리 직원이 남는다. `channel`은 이후 관리자 통계에도 쓸 수 있다.
 - **확장으로 둔 것**: 비회원 온라인 예매(휴대폰 번호 · 조회 비밀번호, 별도 인증 흐름 필요, 확장 중 우선순위 높음). 이때도 `channel` · `handledBy`는 그대로 쓴다.
 - **후속 작업**: `Member.Role` 주석(STAFF의 "예매 등록 · 편집", CUSTOMER의 "편집(예매변경)")을 실제 동작에 맞게 수정한다.
-- **구현 시 결정할 것 (2026-10-23 검토)**: 생성 방식. 생성자 하나에 경로 · 처리 직원을 넘기는 안과, 정적 팩토리 메서드 `Reservation.online(회원, 상영 일정)` · `Reservation.boxOffice(회원, 상영 일정, 처리 직원)`로 나누는 안(권장: null을 넘길 일이 없고 잘못된 조합을 만들 방법이 사라짐). 어느 쪽이든 엔티티는 "ONLINE이면 처리 직원 없음, BOX_OFFICE면 처리 직원 필수"를 보장하고, 처리 직원이 STAFF 이상인지는 서비스에서 검사한다.
+- **구현 (2026-10-25)**: 
+  - 생성자를 private으로 두고 **정적 팩토리 메서드** `Reservation.online(회원, 상영 일정)` · `Reservation.boxOffice(회원, 상영 일정, 처리 직원)`로만 생성한다. `online()`은 경로 ONLINE · 처리 직원 없음을 스스로 채우고, `boxOffice()`는 처리 직원이 null이면 거부한다(400). 호출하는 쪽이 null을 넘기거나 경로와 처리 직원을 잘못 조합할 방법이 없다. 생성자 하나에 인자 4개를 받는 안(검토한 대안)은 온라인 예약에 null을 넘겨야 하고 잘못된 조합을 생성자 검사에 의존한다.
+  - `Channel` enum(ONLINE "온라인" / BOX_OFFICE "매표소"), `channel`(NOT NULL), `handledBy`(`handled_by_id`, NULL 허용) 추가. 둘 다 변경 메서드가 없다(D-10). 새 컬럼 추가는 `ddl-auto=update`가 처리했다.
+  - 처리 직원이 STAFF 이상인지는 서비스에서 검사한다(권한 계층은 Spring Security가 관리).
+  - `Member.Role` 주석을 수정했다: STAFF는 예매 등록(회원 대리 예약 · 현장 판매)과 전체 회원 예매 조회 · 취소, CUSTOMER는 자기 예매 등록 · 조회 · 취소. 예매 변경은 전 등급 공통으로 취소 후 재예약.
+  - 검증: 단위 테스트에 생성 규칙 3개 추가(경로 · 처리 직원이 올바르게 채워지는지, 매표소 예약의 처리 직원 누락 거부). 전체 테스트 35개.
 
 ### D-44. 상영 일정 변경 제한과 등록 경합도 비관적 락으로 처리
 
@@ -437,3 +447,4 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 | 2026-10-22 | D-38에 구현 · 검증 추가, 예약 · 동시성 설계 결정 D-39 ~ D-45 추가, D-35 보완 예정(409) 추가 |
 | 2026-10-23 | D-01 보완(JDK 보안 패치 정책, CVE-2026-91403) |
 | 2026-10-23 | D-41 구현 기록, D-37에 단위 테스트 규칙(9) 추가, D-35에 IllegalStateException 409 처리기 현황 · 교체 계획 추가, D-43에 생성 방식 검토 추가 |
+| 2026-10-25 | D-43 구현(정적 팩토리 메서드, channel · handledBy), D-35에 ConflictException 구현 · IllegalArgumentException 처리기 위험 기록 |
