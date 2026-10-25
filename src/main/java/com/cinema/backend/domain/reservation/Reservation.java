@@ -8,6 +8,8 @@
  *              개별 상태 변환 메서드(confirm(), cancel(), expire())
  *              + 전이 검사 공통 메서드(validateTransition()) 방식으로 리워크,
  *              리워크 과정에서 ReservationStatus에 한국어 label 추가(예외 메시지 출력용)
+ * -2026-10-25: 예매 경로 및 예매 담당 직원 필드 추가
+ *              이에 따른 예매 경로 enum 추가 및 생성자 구조 재설계
  ***/
 package com.cinema.backend.domain.reservation;
 
@@ -28,7 +30,7 @@ import java.util.Set;
 @Getter
 public class Reservation extends BaseEntity {
 
-    public Reservation(Member member, Showtime showtime) {
+    private Reservation(Member member, Showtime showtime, Channel channel, Member handledBy) {
 
         if (member == null) {
 
@@ -41,6 +43,22 @@ public class Reservation extends BaseEntity {
         }
         this.member = member;
         this.showtime = showtime;
+        this.channel = channel;
+        this.handledBy = handledBy;
+    }
+
+    public static Reservation online(Member member, Showtime showtime) {
+
+        return new Reservation(member, showtime, Channel.ONLINE, null);
+    }
+
+    public static Reservation boxOffice(Member member, Showtime showtime, Member handledBy) {
+
+        if (handledBy == null) {
+
+            throw new IllegalArgumentException("매표소 예약에는 처리 직원 정보가 필요합니다.");
+        }
+        return new Reservation(member, showtime, Channel.BOX_OFFICE, handledBy);
     }
 
     @Id
@@ -57,7 +75,38 @@ public class Reservation extends BaseEntity {
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
+    private Channel channel;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "handled_by_id")
+    private Member handledBy;
+
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
     private ReservationStatus reservationStatus = ReservationStatus.PENDING;
+
+    public enum Channel {
+
+        /***
+         * 예약경로코드: ONLINE-BOX_OFFICE로 예약 경로 이분화
+         * ONLINE: 고객이 직접 온라인 예매하는 경우
+         * BOX_OFFICE: 현장 매표소에서 고객의 요청에 따라 직원이 예매 처리를 대행하는 경우
+         ***/
+        ONLINE("온라인"),
+        BOX_OFFICE("매표소");
+
+        private final String label;
+
+        Channel(String label) {
+
+            this.label = label;
+        }
+
+        public String getLabel() {
+
+            return label;
+        }
+    }
 
     public enum ReservationStatus {
 

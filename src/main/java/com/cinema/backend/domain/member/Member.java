@@ -5,6 +5,7 @@
  * -2026-09-03: BaseEntity 상속 추가
  * -2026-09-10: 외부 접근 허용 메서드의 enum 파라미터를 String 기반으로 교체, 탈퇴여부 필드 추가
  * -2026-10-08: 외부에서 기본 생성자로 빈 엔티티를 생성하지 못하도록 @NoArgsConstructor를 protected로 제한
+ * -2026-10-25: 사용자 등급 체계에 대한 의사 결정에 따른 등급별 권한에 대한 주석 내용 보완
  ***/
 package com.cinema.backend.domain.member;
 
@@ -52,8 +53,9 @@ public class Member extends BaseEntity {
          * 상위 등급의 권한은 하위 등급의 권한을 포함함
          * ADMIN: MANAGER, STAFF 등급 계정 생성 및 권한 변경 권한
          * MANAGER: 영화 및 상영시간표 편집 권한
-         * STAFF: 예매 등록 및 예매내역 조회 및 편집, 취소 권한
-         * CUSTOMER: 영화 및 상영시간표 조회, 자기 자신의 예매 및 예매내역 조회, 편집(예매변경), 취소 권한
+         * STAFF: 예매 등록(회원 대리 예약·현장 판매) 및 전체 회원 대상 예매내역 조회, 취소 권한
+         * CUSTOMER: 영화 및 상영시간표 조회, 자기 자신의 예매 등록 및 예매내역 조회, 취소 권한
+         * ※ 전 등급 공통으로 예매 변경은 update 방식이 아니라 취소 후 재등록하는 방식
          ***/
         ADMIN, MANAGER, STAFF, CUSTOMER
     }
