@@ -6,11 +6,14 @@
  *              online_without_handled_by_success(),
  *              box_office_handled_by_is_same_as_staff(),
  *              box_office_without_handled_by_rejected()
+ * -2026-10-25: IllegalStateException 처리기를 ConflictException으로 대체함에 따른
+ *              예외 인스턴스 검사 코드 수정
  ***/
 package com.cinema.backend.domain.reservation;
 
 import com.cinema.backend.domain.member.Member;
 import com.cinema.backend.domain.showtime.Showtime;
+import com.cinema.backend.global.exception.ConflictException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +48,7 @@ class ReservationTest {
         reservation.confirm(); // 준비: 예매 완료 상태로 만들기
 
         assertThatThrownBy(reservation::confirm)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("예매 완료 상태의 예약은 확정할 수 없습니다");
 
         assertThat(reservation.getReservationStatus()).isEqualTo(Reservation.ReservationStatus.CONFIRMED);
@@ -59,7 +62,7 @@ class ReservationTest {
         reservation.cancel(); // 준비: 취소 상태로 만들기
 
         assertThatThrownBy(reservation::confirm)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("취소 상태의 예약은 확정할 수 없습니다");
 
         assertThat(reservation.getReservationStatus()).isEqualTo(Reservation.ReservationStatus.CANCELED);
@@ -73,7 +76,7 @@ class ReservationTest {
         reservation.expire(); // 준비: 만료 상태로 만들기
 
         assertThatThrownBy(reservation::confirm)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("만료 상태의 예약은 확정할 수 없습니다");
 
         assertThat(reservation.getReservationStatus()).isEqualTo(Reservation.ReservationStatus.EXPIRED);
@@ -110,7 +113,7 @@ class ReservationTest {
         reservation.cancel(); // 준비: 취소 상태로 만들기
 
         assertThatThrownBy(reservation::cancel)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("취소 상태의 예약은 취소할 수 없습니다");
 
         assertThat(reservation.getReservationStatus()).isEqualTo(Reservation.ReservationStatus.CANCELED);
@@ -124,7 +127,7 @@ class ReservationTest {
         reservation.expire(); // 준비: 만료 상태로 만들기
 
         assertThatThrownBy(reservation::cancel)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("만료 상태의 예약은 취소할 수 없습니다");
 
         assertThat(reservation.getReservationStatus()).isEqualTo(Reservation.ReservationStatus.EXPIRED);
@@ -149,7 +152,7 @@ class ReservationTest {
         reservation.confirm(); // 준비: 예매 완료 상태로 만들기
 
         assertThatThrownBy(reservation::expire)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("예매 완료 상태의 예약은 만료 처리할 수 없습니다");
 
         assertThat(reservation.getReservationStatus()).isEqualTo(Reservation.ReservationStatus.CONFIRMED);
@@ -163,7 +166,7 @@ class ReservationTest {
         reservation.cancel(); // 준비: 취소 상태로 만들기
 
         assertThatThrownBy(reservation::expire)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("취소 상태의 예약은 만료 처리할 수 없습니다");
 
         assertThat(reservation.getReservationStatus()).isEqualTo(Reservation.ReservationStatus.CANCELED);
@@ -177,7 +180,7 @@ class ReservationTest {
         reservation.expire(); // 준비: 만료 상태로 만들기
 
         assertThatThrownBy(reservation::expire)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("만료 상태의 예약은 만료 처리할 수 없습니다");
 
         assertThat(reservation.getReservationStatus()).isEqualTo(Reservation.ReservationStatus.EXPIRED);

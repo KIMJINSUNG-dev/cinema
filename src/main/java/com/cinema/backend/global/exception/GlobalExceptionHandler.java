@@ -8,6 +8,9 @@
  *              내부 예외 클래스명·스택은 로그로만 남기고 응답 본문에는 노출하지 않음
  * -2026-10-15: AccessDeniedException 핸들러 추가
  * -2026-10-23: IllegalStateException 핸들러 추가
+ * -2026-10-25: IllegalStateException 핸들러가 라이브러리의 오류까지 같이 처리하는 문제를 해결하기 위해
+ *              해당 핸들러를 ConflictException 핸들러로 교체
+ *              (의도하지 않은 IllegalStateException은 handleException() 메서드에서 500 응답으로 처리)
  ***/
 package com.cinema.backend.global.exception;
 
@@ -31,8 +34,8 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
     }
 
-    @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<String> handleIllegalStateException(IllegalStateException e) {
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<String> handleConflictException(ConflictException e) {
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }

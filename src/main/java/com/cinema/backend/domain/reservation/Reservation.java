@@ -10,12 +10,15 @@
  *              리워크 과정에서 ReservationStatus에 한국어 label 추가(예외 메시지 출력용)
  * -2026-10-25: 예매 경로 및 예매 담당 직원 필드 추가
  *              이에 따른 예매 경로 enum 추가 및 생성자 구조 재설계
+ * -2026-10-25: IllegalStateException 처리기를 ConflictException으로 대체함에 따른
+ *              validateTransition() 메서드 내부의 예외 인스턴스 변경
  ***/
 package com.cinema.backend.domain.reservation;
 
 import com.cinema.backend.domain.member.Member;
 import com.cinema.backend.domain.showtime.Showtime;
 import com.cinema.backend.global.common.BaseEntity;
+import com.cinema.backend.global.exception.ConflictException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -159,7 +162,7 @@ public class Reservation extends BaseEntity {
 
         if (!allowedFrom.contains(this.reservationStatus)) {
 
-            throw new IllegalStateException(
+            throw new ConflictException(
                     String.format(
                             "%s 상태의 예약은 %s할 수 없습니다.",
                             this.reservationStatus.getLabel(),
