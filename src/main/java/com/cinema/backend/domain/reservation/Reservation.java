@@ -12,10 +12,14 @@
  *              이에 따른 예매 경로 enum 추가 및 생성자 구조 재설계
  * -2026-10-25: IllegalStateException 처리기를 ConflictException으로 대체함에 따른
  *              validateTransition() 메서드 내부의 예외 인스턴스 변경
+ * -2026-10-26: Reservation이 자신에 종속되는 ReservationSeat 목록을 알아야 하는 논리에 따른
+ *              ReservationSeat 목록 조회·생성 및 추가 기능 추가
+ *              (실제 DB에 반영되지는 않는 편의 메서드, DB 저장은 ReservationSeat를 별도로 save() 처리)
  ***/
 package com.cinema.backend.domain.reservation;
 
 import com.cinema.backend.domain.member.Member;
+import com.cinema.backend.domain.screen.Seat;
 import com.cinema.backend.domain.showtime.Showtime;
 import com.cinema.backend.global.common.BaseEntity;
 import com.cinema.backend.global.exception.ConflictException;
@@ -24,8 +28,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.EnumSet;
-import java.util.Set;
+import java.util.*;
 
 @Entity
 @Table(name = "reservations")
@@ -88,6 +91,9 @@ public class Reservation extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private ReservationStatus reservationStatus = ReservationStatus.PENDING;
 
+    @OneToMany(mappedBy = "reservation")
+    private List<ReservationSeat> reservationSeats = new ArrayList<>();
+
     public enum Channel {
 
         /***
@@ -148,14 +154,14 @@ public class Reservation extends BaseEntity {
 
         validateTransition("취소", EnumSet.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED));
         this.reservationStatus = ReservationStatus.CANCELED;
-        // TODO: 예약 좌석 활성 표시 해제
+        this.reservationSeats.forEach(ReservationSeat::deactivate);
     }
 
     public void expire() {
 
         validateTransition("만료 처리", EnumSet.of(ReservationStatus.PENDING));
         this.reservationStatus = ReservationStatus.EXPIRED;
-        // TODO: 예약 좌석 활성 표시 해제
+        this.reservationSeats.forEach(ReservationSeat::deactivate);
     }
 
     private void validateTransition(String action, Set<ReservationStatus> allowedFrom) {
@@ -170,5 +176,19 @@ public class Reservation extends BaseEntity {
                     )
             );
         }
+    }
+
+    public ReservationSeat addSeat(Seat seat, int price) {
+
+        validateTransition("좌석을 추가", EnumSet.of(ReservationStatus.PENDING));
+        ReservationSeat reservationSeat = new ReservationSeat(this, seat, price);
+        this.reservationSeats.add(reservationSeat);
+        return reservationSeat;
+    }
+
+    // 읽기 전용 메서드
+    public List<ReservationSeat> getReservationSeats() {
+
+        return Collections.unmodifiableList(reservationSeats);
     }
 }

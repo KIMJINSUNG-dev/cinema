@@ -8,10 +8,14 @@
  *              box_office_without_handled_by_rejected()
  * -2026-10-25: IllegalStateException 처리기를 ConflictException으로 대체함에 따른
  *              예외 인스턴스 검사 코드 수정
+ * -2026-10-26: ReservationSeat.java의 DB 유니크 제약 기능 구현 및
+ *              Reservation.java, ReservationSeat.java 사이의
+ *              양방향 관계 구현에 따른 검증 메서드 추가
  ***/
 package com.cinema.backend.domain.reservation;
 
 import com.cinema.backend.domain.member.Member;
+import com.cinema.backend.domain.screen.Seat;
 import com.cinema.backend.domain.showtime.Showtime;
 import com.cinema.backend.global.exception.ConflictException;
 import org.junit.jupiter.api.DisplayName;
@@ -228,5 +232,103 @@ class ReservationTest {
         )
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("매표소 예약에는 처리 직원 정보가 필요합니다.");
+    }
+
+    @Test
+    @DisplayName("예매와 예매좌석의 상영정보가 일치, 예매좌석의 활성화 초기값은 활성화, 가격은 설정한 대로, 목록이 추가한 예매좌석을 정확히 포함")
+    void reservation_add_seat_data_expected() {
+
+        Reservation reservation = newReservation();
+
+        int price = 10000;
+        ReservationSeat reservationSeat = reservation.addSeat(mock(Seat.class), price);
+        assertThat(reservation.getShowtime()).isSameAs(reservationSeat.getShowtime());
+        assertThat(reservationSeat.getActive()).isTrue();
+        assertThat(reservationSeat.getPrice()).isEqualTo(price);
+        assertThat(reservation.getReservationSeats()).containsExactly(reservationSeat);
+    }
+
+    @Test
+    @DisplayName("예매 취소 시 좌석 활성화 해제")
+    void reservation_cancel_seat_deactivate() {
+
+        Reservation reservation = newReservation();
+
+        ReservationSeat reservationSeat1 = reservation.addSeat(mock(Seat.class), 0);
+        ReservationSeat reservationSeat2 = reservation.addSeat(mock(Seat.class), 0);
+        reservation.cancel();
+        assertThat(reservationSeat1.getActive()).isNull();
+        assertThat(reservationSeat2.getActive()).isNull();
+    }
+
+    @Test
+    @DisplayName("예매 만료 시 좌석 활성화 해제")
+    void reservation_expire_seat_deactivate() {
+
+        Reservation reservation = newReservation();
+
+        ReservationSeat reservationSeat1 = reservation.addSeat(mock(Seat.class), 0);
+        ReservationSeat reservationSeat2 = reservation.addSeat(mock(Seat.class), 0);
+        reservation.expire();
+        assertThat(reservationSeat1.getActive()).isNull();
+        assertThat(reservationSeat2.getActive()).isNull();
+    }
+
+    @Test
+    @DisplayName("예매 확정 시 좌석 활성화 유지")
+    void reservation_confirm_seat_stays_active() {
+
+        Reservation reservation = newReservation();
+
+        ReservationSeat reservationSeat = reservation.addSeat(mock(Seat.class), 0);
+        reservation.confirm();
+        assertThat(reservationSeat.getActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("예매 완료 상태에서 좌석 추가 거부")
+    void confirmed_reservation_add_seat_rejected() {
+
+        Reservation reservation = newReservation();
+
+        ReservationSeat reservationSeat = reservation.addSeat(mock(Seat.class), 0);
+        reservation.confirm();
+
+        assertThatThrownBy(() -> reservation.addSeat(mock(Seat.class), 0))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("예매 완료 상태의 예약은 좌석을 추가할 수 없습니다.");
+        assertThat(reservation.getReservationSeats()).containsExactly(reservationSeat);
+    }
+
+    @Test
+    @DisplayName("예매 좌석 추가 시 좌석에 null 할당 거부")
+    void reservation_add_seat_seat_data_null_rejected() {
+
+        Reservation reservation = newReservation();
+
+        assertThatThrownBy(() -> reservation.addSeat(null, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("좌석은 비워둘 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("예매 좌석 추가 시 가격에 음수 할당 거부")
+    void reservation_add_seat_price_negative_number_rejected() {
+
+        Reservation reservation = newReservation();
+
+        assertThatThrownBy(() -> reservation.addSeat(mock(Seat.class), -1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("가격은 0보다 작을 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("예매 좌석 목록 직접 수정 거부")
+    void reservation_seats_update_rejected() {
+
+        Reservation reservation = newReservation();
+
+        assertThatThrownBy(() -> reservation.getReservationSeats().add(null))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 }
