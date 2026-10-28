@@ -11,10 +11,13 @@
  * -2026-10-25: IllegalStateException 핸들러가 라이브러리의 오류까지 같이 처리하는 문제를 해결하기 위해
  *              해당 핸들러를 ConflictException 핸들러로 교체
  *              (의도하지 않은 IllegalStateException은 handleException() 메서드에서 500 응답으로 처리)
+ * -2026-10-28: DataIntegrityViolationException 핸들러 추가 및
+ *              내부 메시지가 외부에 노출되지 않도록 작업, 개발자는 확인할 수 있도록 log.warn() 코드 추가
  ***/
 package com.cinema.backend.global.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -38,6 +41,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleConflictException(ConflictException e) {
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<String> handleDataIntegrityViolationException(DataIntegrityViolationException e) {
+
+        log.warn("요청과 데이터 상태 간 충돌 오류", e);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body("요청이 현재 데이터 상태와 충돌합니다. 다시 시도해 주세요.");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
