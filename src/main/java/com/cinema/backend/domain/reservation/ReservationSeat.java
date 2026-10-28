@@ -7,6 +7,7 @@
  * -2026-10-26: 상영정보·예약 활성화 플래그 필드 추가 및 가격 update 관련 의사 결정에 따른
  *              생성자 구조 변경 및 updatePrice() 메서드 삭제, deactivate() 메서드 추가
  * -2026-10-26: 상영정보, 좌석, 예약 활성화 플래그로 DB 유니크 제약 생성
+ * -2026-10-28: deactivate() 메서드에 호출 관련 안내 주석 추가
  ***/
 package com.cinema.backend.domain.reservation;
 
@@ -88,6 +89,7 @@ public class ReservationSeat extends BaseEntity {
     @Column(name = "active_flag")
     private Boolean active = true;
 
+    // 엔티티 계층 호출용 메서드, 서비스 계층에서 호출 금지
     void deactivate() {
 
         this.active = null;

@@ -15,6 +15,10 @@
  * -2026-10-26: Reservation이 자신에 종속되는 ReservationSeat 목록을 알아야 하는 논리에 따른
  *              ReservationSeat 목록 조회·생성 및 추가 기능 추가
  *              (실제 DB에 반영되지는 않는 편의 메서드, DB 저장은 ReservationSeat를 별도로 save() 처리)
+ *              2026-10-28: 코드 리워크로 해당 주석은 더 이상 유효하지 않음
+ * -2026-10-28: 예약을 DB에 저장할 때(reservationSeats)
+ *              예약 객체에 포함된 ReservationSeat 목록의 예약 좌석도 저장되도록
+ *              reservationSeats 필드에 cascade = CascadeType.PERSIST 적용
  ***/
 package com.cinema.backend.domain.reservation;
 
@@ -91,7 +95,7 @@ public class Reservation extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private ReservationStatus reservationStatus = ReservationStatus.PENDING;
 
-    @OneToMany(mappedBy = "reservation")
+    @OneToMany(mappedBy = "reservation", cascade = CascadeType.PERSIST)
     private List<ReservationSeat> reservationSeats = new ArrayList<>();
 
     public enum Channel {
