@@ -2,12 +2,17 @@
  * ReservationService.createOnlineReservation()의 예약 조건 검사(D-42) 통합 테스트를 담당하는 클래스
  * 작성이력
  * -2026-10-29: 파일 생성 및 작성
+ * -2026-10-30: createOnlineReservation() 반환 타입 변경(ReservationResponse)에 따른 성공 테스트 수정,
+ *              상영 일정 id null 검사 거부 시나리오 추가
+ * -2026-10-30: 성공 테스트에 ReservationResponse 응답 검증(상태 · 경로 · 상영 정보 · 좌석 목록 · 총액) 추가
  ***/
 package com.cinema.backend.domain.reservation;
 
 import com.cinema.backend.TestcontainersConfiguration;
 import com.cinema.backend.domain.member.MemberService;
 import com.cinema.backend.domain.movie.MovieService;
+import com.cinema.backend.domain.reservation.dto.ReservationResponse;
+import com.cinema.backend.domain.reservation.dto.ReservationSeatResponse;
 import com.cinema.backend.domain.screen.ScreenService;
 import com.cinema.backend.domain.screen.SeatGradeService;
 import com.cinema.backend.domain.screen.SeatService;
@@ -84,13 +89,41 @@ class ReservationConditionTest {
     }
 
     @Test
+    @DisplayName("상영 일정 id가 없으면 거부된다 (400)")
+    void nullShowtimeId_rejected() {
+
+        assertThatThrownBy(() -> reservationService.createOnlineReservation(
+                memberEmail, null, List.of(seatA1Id)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("잘못된 상영정보입니다.");
+    }
+
+    @Test
     @DisplayName("정상 예약: 기준 가격이 다른 좌석 2석을 예약하면 확정 상태로 저장되고 좌석별 가격이 등급 기준 가격과 같다")
     void createOnlineReservation_success() {
 
-        Long reservationId = reservationService.createOnlineReservation(
+        ReservationResponse response = reservationService.createOnlineReservation(
                 memberEmail, showtimeId, List.of(seatA1Id, seatB1Id));
 
-        Reservation reservation = reservationRepository.findById(reservationId).orElseThrow();
+        // 응답 DTO 검증: 상태 · 경로 · 상영 정보 · 좌석 목록 · 총액
+        assertThat(response.getReservationStatus()).isEqualTo(Reservation.ReservationStatus.CONFIRMED);
+        assertThat(response.getChannel()).isEqualTo(Reservation.Channel.ONLINE);
+        assertThat(response.getShowtimeId()).isEqualTo(showtimeId);
+        assertThat(response.getMovieName()).isEqualTo("조건검사 테스트 영화");
+        assertThat(response.getScreenName()).isEqualTo("조건검사 테스트관");
+        assertThat(response.getStartTime()).isEqualTo(at(1, 13, 0));
+        assertThat(response.getTotalPrice()).isEqualTo(30000);
+        assertThat(response.getSeats())
+                .extracting(
+                        ReservationSeatResponse::getSeatId,
+                        ReservationSeatResponse::getSeatCode,
+                        ReservationSeatResponse::getPrice)
+                .containsExactlyInAnyOrder(
+                        tuple(seatA1Id, "A1", 10000),
+                        tuple(seatB1Id, "B1", 20000)
+                );
+
+        Reservation reservation = reservationRepository.findById(response.getId()).orElseThrow();
 
         assertThat(reservation.getReservationStatus()).isEqualTo(Reservation.ReservationStatus.CONFIRMED);
         assertThat(reservation.getChannel()).isEqualTo(Reservation.Channel.ONLINE);

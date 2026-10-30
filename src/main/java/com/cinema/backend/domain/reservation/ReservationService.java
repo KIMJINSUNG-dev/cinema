@@ -3,11 +3,15 @@
  * 작성이력
  * -2026-10-28: 파일 생성 및 작성
  * -2026-10-29: createOnlineReservation() 메서드에 조건 검사 논리 추가 구현
+ * -2026-10-30: createOnlineReservation() 반환 타입을 Long에서 ReservationResponse로 변경
+ *              (다른 서비스와의 일관성, 영화명 · 상영관명은 트랜잭션 안에서 DTO로 변환)
+ *              맨 앞에 상영 일정 id null 검사 추가(ShowtimeService의 null 검사 방식 참고)
  ***/
 package com.cinema.backend.domain.reservation;
 
 import com.cinema.backend.domain.member.Member;
 import com.cinema.backend.domain.member.MemberRepository;
+import com.cinema.backend.domain.reservation.dto.ReservationResponse;
 import com.cinema.backend.domain.screen.Seat;
 import com.cinema.backend.domain.screen.SeatRepository;
 import com.cinema.backend.domain.showtime.Showtime;
@@ -38,11 +42,16 @@ public class ReservationService {
 
     // 락을 적용한 뒤 예약 좌석 검사 시 최신 커밋을 체크하도록 READ_COMMITTED 지정
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    public Long createOnlineReservation(
+    public ReservationResponse createOnlineReservation(
             String email,
             Long showtimeId,
             List<Long> seatIds
     ) {
+
+        if (showtimeId == null) {
+
+            throw new IllegalArgumentException("잘못된 상영정보입니다.");
+        }
 
         Member member = memberRepository.findByEmail(email);
 
@@ -114,6 +123,6 @@ public class ReservationService {
         reservationRepository.save(reservation);
         reservation.confirm();
 
-        return reservation.getId();
+        return new ReservationResponse(reservation);
     }
 }

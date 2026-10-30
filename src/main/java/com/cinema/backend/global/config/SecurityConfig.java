@@ -6,6 +6,7 @@
  * -2026-10-12: SeatGradeController 작성에 따른 filterChain() 메서드에의 권한 체계 추가
  * -2026-10-15: ShowtimeController 작성에 따른 filterChain() 메서드에의 권한 체계 추가
  * -2026-10-15: filterChain() 메서드 권한 처리를 denyAll() 기반으로 재정비
+ * -2026-10-30: ReservationController 작성에 따른 filterChain() 메서드에의 권한 체계 추가
  ***/
 package com.cinema.backend.global.config;
 
@@ -71,7 +72,8 @@ public class SecurityConfig {
                         ).hasAnyRole("CUSTOMER")
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/api/auths/logout"
+                                "/api/auths/logout",
+                                "/api/reservations/online"
                         ).hasAnyRole("CUSTOMER")
                         .requestMatchers(
                                 HttpMethod.PATCH,
