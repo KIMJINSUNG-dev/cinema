@@ -11,6 +11,14 @@
  *              cancelReservation()), 공통으로 쓰는 private 메서드(findActiveMember(), findReservationEntity(),
  *              validateOwnership(), validateCancelDeadline()) 추가
  *              기존 createOnlineReservation()은 변경하지 않음(CLAUDE.md 기존 코드 보호 규칙)
+ * -2026-10-31: 직원 예약(회원 대리 예약 · 현장 판매, D-43) 추가
+ *              createOnlineReservation()의 "회원 검사 이후" 공통 로직을 private createReservation()으로 추출하고
+ *              (상영 일정 id null 검사 · 좌석 수 · 중복 검사 · 상영 일정 락 · 상태 · 시작 시각 검사 ·
+ *              좌석 소속 · 활성 · 이미 예약됨 검사 · 좌석 추가 · 저장 · 확정, 검사 순서 · 예외 종류 · 메시지는 그대로 유지)
+ *              createOnlineReservation() · createBoxOfficeMemberReservation() · createBoxOfficeWalkInReservation()
+ *              세 진입 메서드가 Reservation 생성 방식(online/boxOffice)만 다르게 넘겨 공통으로 사용
+ *              private 메서드(findActiveMemberById(), findActiveStaff()) 추가
+ *              createOnlineReservation()의 회원 조회 · 검증 로직을 기존 findActiveMember()로 대체(중복 제거)
  ***/
 package com.cinema.backend.domain.reservation;
 
@@ -32,8 +40,10 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -52,6 +62,14 @@ public class ReservationService {
     @Value("${cinema.reservation.cancel-deadline-minutes}")
     private int cancelDeadlineMinutes;
 
+    // 현장 판매 예약의 주인(member), WalkInAccountInitializer가 앱 시작 시 이 이메일로 계정을 생성해둠 (D-43)
+    @Value("${cinema.reservation.walk-in-account-email}")
+    private String walkInAccountEmail;
+
+    // 매표소 예약 처리 직원으로 허용하는 역할 (D-12 역할 계층과 같은 "허용 목록" 방식, D-41 validateTransition()과 같은 이유)
+    private static final EnumSet<Member.Role> STAFF_OR_ABOVE =
+            EnumSet.of(Member.Role.STAFF, Member.Role.MANAGER, Member.Role.ADMIN);
+
     // 락을 적용한 뒤 예약 좌석 검사 시 최신 커밋을 체크하도록 READ_COMMITTED 지정
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ReservationResponse createOnlineReservation(
@@ -60,21 +78,75 @@ public class ReservationService {
             List<Long> seatIds
     ) {
 
+        Member member = findActiveMember(email);
+
+        return createReservation(showtimeId, seatIds, showtime -> Reservation.online(member, showtime));
+    }
+
+    // 직원용: 회원 대리 예약 (주인 = 대상 회원, 처리 직원 = 로그인한 직원, D-43)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public ReservationResponse createBoxOfficeMemberReservation(
+            String staffEmail,
+            Long targetMemberId,
+            Long showtimeId,
+            List<Long> seatIds
+    ) {
+
+        Member staff = findActiveStaff(staffEmail);
+        Member targetMember = findActiveMemberById(targetMemberId);
+
+        if (walkInAccountEmail.equals(targetMember.getEmail())) {
+
+            // 대리 예약 API로 현장 판매(시스템 계정 소유)를 만드는 우회 경로 차단
+            throw new IllegalArgumentException("현장 판매 시스템 계정은 대리 예약 대상이 될 수 없습니다.");
+        }
+
+        return createReservation(
+                showtimeId, seatIds, showtime -> Reservation.boxOffice(targetMember, showtime, staff));
+    }
+
+    // 직원용: 현장 판매 (주인 = 현장 판매 시스템 계정, 처리 직원 = 로그인한 직원, D-43)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public ReservationResponse createBoxOfficeWalkInReservation(
+            String staffEmail,
+            Long showtimeId,
+            List<Long> seatIds
+    ) {
+
+        Member staff = findActiveStaff(staffEmail);
+
+        Member walkInAccount = memberRepository.findByEmail(walkInAccountEmail);
+
+        if (walkInAccount == null) {
+
+            // 시스템 계정은 앱 시작 시 WalkInAccountInitializer가 자동 생성하므로, 여기서 없다면 설정값 오류 등 서버 문제다
+            throw new IllegalStateException("현장 판매 시스템 계정을 찾을 수 없습니다.");
+        }
+
+        return createReservation(
+                showtimeId, seatIds, showtime -> Reservation.boxOffice(walkInAccount, showtime, staff));
+    }
+
+    /*
+     * 예약 공통 로직(D-39 · D-42): 상영 일정 id null 검사 · 좌석 수 · 중복 검사 ·
+     * 상영 일정 락(비관적 락) · 상태 · 시작 시각 검사 · 좌석 소속 · 활성 · 이미 예약됨 검사 ·
+     * 좌석 추가 · 저장 · 확정. 온라인 · 대리 · 현장 세 경로가 공통으로 사용하며,
+     * 예약 객체 생성 방식(online/boxOffice)만 reservationFactory로 경로별로 다르게 받는다.
+     * 검사 순서와 예외 종류 · 메시지는 기존 createOnlineReservation()과 같다.
+     *
+     * 주의: 이 메서드에는 @Transactional을 붙이지 않는다. private 메서드 호출은 프록시를 거치지 않아
+     * 클래스 메서드 호출이 되므로 격리 수준(READ_COMMITTED, D-39)이 적용되지 않는다.
+     * 따라서 이 메서드를 호출하는 공개 진입 메서드(createOnlineReservation() 등) 각각에 붙인다.
+     */
+    private ReservationResponse createReservation(
+            Long showtimeId,
+            List<Long> seatIds,
+            Function<Showtime, Reservation> reservationFactory
+    ) {
+
         if (showtimeId == null) {
 
             throw new IllegalArgumentException("잘못된 상영정보입니다.");
-        }
-
-        Member member = memberRepository.findByEmail(email);
-
-        if (member == null) {
-
-            throw new IllegalArgumentException("존재하지 않는 회원정보입니다.");
-        }
-
-        if (member.getIsWithdrawn()) {
-
-            throw new IllegalArgumentException("탈퇴한 회원정보입니다.");
         }
 
         if (seatIds == null || seatIds.isEmpty()) {
@@ -109,7 +181,7 @@ public class ReservationService {
             throw new ConflictException("상영정보의 예매 가능 시간이 종료되었습니다.");
         }
 
-        Reservation reservation = Reservation.online(member, showtime);
+        Reservation reservation = reservationFactory.apply(showtime);
 
         for (Long seatId : seatIds) {
 
@@ -223,6 +295,41 @@ public class ReservationService {
             throw new IllegalArgumentException("탈퇴한 회원정보입니다.");
         }
         return member;
+    }
+
+    // 회원 존재 · 탈퇴 검사 (findActiveMember()와 같은 메시지, id 기준. 대리 예약 대상 회원 확인에 사용)
+    private Member findActiveMemberById(Long memberId) {
+
+        if (memberId == null) {
+
+            throw new IllegalArgumentException("잘못된 회원정보입니다.");
+        }
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원정보입니다."));
+
+        if (member.getIsWithdrawn()) {
+
+            throw new IllegalArgumentException("탈퇴한 회원정보입니다.");
+        }
+        return member;
+    }
+
+    /*
+     * 매표소 예약 처리 직원 확인(D-43): 토큰의 role은 발급 시점 기준이라 강등 · 탈퇴 후에도
+     * Access Token이 만료되기 전까지는 요청이 통과한다(D-18과 같은 한계).
+     * 매표소 예약은 처리 직원(handledBy)이 기록으로 남으므로, 여기서는 토큰이 아니라
+     * DB의 최신 상태(존재 여부 · 탈퇴 여부 · 역할)를 다시 확인한다.
+     */
+    private Member findActiveStaff(String email) {
+
+        Member staff = memberRepository.findByEmail(email);
+
+        if (staff == null || staff.getIsWithdrawn() || !STAFF_OR_ABOVE.contains(staff.getRole())) {
+
+            throw new AccessDeniedException("권한이 없습니다.");
+        }
+        return staff;
     }
 
     // 예약 존재 검사 (기존 서비스들의 "존재하지 않는 ~" 메시지 방식)

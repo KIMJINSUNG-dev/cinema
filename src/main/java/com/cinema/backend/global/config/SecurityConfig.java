@@ -10,6 +10,7 @@
  * -2026-10-31: 예매 내역 조회 · 취소 API 권한 추가
  *              GET /api/reservations/*가 /api/reservations/me와도 일치하므로(D-34와 같은 문제),
  *              고객용 /me 규칙(GET · PATCH)을 직원용 규칙보다 위에 둠
+ * -2026-10-31: 직원 예약(회원 대리 예약 · 현장 판매) API 권한 추가 (D-43)
  ***/
 package com.cinema.backend.global.config;
 
@@ -80,6 +81,10 @@ public class SecurityConfig {
                                 "/api/auths/logout",
                                 "/api/reservations/online"
                         ).hasAnyRole("CUSTOMER")
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/reservations/box-office/**"
+                        ).hasAnyRole("STAFF")
                         .requestMatchers(
                                 HttpMethod.PATCH,
                                 "/api/members/*/nickname",

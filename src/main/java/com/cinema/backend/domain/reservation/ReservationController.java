@@ -5,12 +5,16 @@
  * -2026-10-31: 예매 내역 조회 · 취소 API 추가
  *              고객용(/me, 본인 예약만, email은 @AuthenticationPrincipal) ·
  *              직원용(memberId 쿼리 파라미터, 전체 회원 대상) 경로 분리 (D-13 · D-46)
+ * -2026-10-31: 직원 예약(회원 대리 예약 · 현장 판매) API 추가 (D-43)
+ *              처리 직원도 요청 본문이 아니라 로그인 정보(@AuthenticationPrincipal)에서 받음
  *
  * 예약 주체(회원)는 요청 본문이 아니라 로그인 정보(@AuthenticationPrincipal)에서 받는다.
  * (AuthController.logout()과 같은 방식)
  ***/
 package com.cinema.backend.domain.reservation;
 
+import com.cinema.backend.domain.reservation.dto.ReservationBoxOfficeMemberCreateRequest;
+import com.cinema.backend.domain.reservation.dto.ReservationBoxOfficeWalkInCreateRequest;
 import com.cinema.backend.domain.reservation.dto.ReservationOnlineCreateRequest;
 import com.cinema.backend.domain.reservation.dto.ReservationResponse;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +42,39 @@ public class ReservationController {
 
         ReservationResponse response = reservationService.createOnlineReservation(
                 email,
+                request.getShowtimeId(),
+                request.getSeatIds()
+        );
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    // 직원용: 회원 대리 예약 (주인 = 대상 회원, 처리 직원 = 로그인한 직원)
+    @PostMapping("/box-office/member")
+    public ResponseEntity<ReservationResponse> createBoxOfficeMemberReservation(
+            @AuthenticationPrincipal String staffEmail,
+            @RequestBody ReservationBoxOfficeMemberCreateRequest request
+    ) {
+
+        ReservationResponse response = reservationService.createBoxOfficeMemberReservation(
+                staffEmail,
+                request.getMemberId(),
+                request.getShowtimeId(),
+                request.getSeatIds()
+        );
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    // 직원용: 현장 판매 (주인 = 현장 판매 시스템 계정, 처리 직원 = 로그인한 직원)
+    @PostMapping("/box-office/walk-in")
+    public ResponseEntity<ReservationResponse> createBoxOfficeWalkInReservation(
+            @AuthenticationPrincipal String staffEmail,
+            @RequestBody ReservationBoxOfficeWalkInCreateRequest request
+    ) {
+
+        ReservationResponse response = reservationService.createBoxOfficeWalkInReservation(
+                staffEmail,
                 request.getShowtimeId(),
                 request.getSeatIds()
         );
