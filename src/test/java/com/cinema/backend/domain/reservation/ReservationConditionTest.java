@@ -5,6 +5,7 @@
  * -2026-10-30: createOnlineReservation() 반환 타입 변경(ReservationResponse)에 따른 성공 테스트 수정,
  *              상영 일정 id null 검사 거부 시나리오 추가
  * -2026-10-30: 성공 테스트에 ReservationResponse 응답 검증(상태 · 경로 · 상영 정보 · 좌석 목록 · 총액) 추가
+ * -2026-10-31: 성공 테스트에 reservedAt(예매 일시) 채워짐 확인 1줄 추가 (예매 내역 조회 · 취소 API)
  ***/
 package com.cinema.backend.domain.reservation;
 
@@ -113,6 +114,7 @@ class ReservationConditionTest {
         assertThat(response.getScreenName()).isEqualTo("조건검사 테스트관");
         assertThat(response.getStartTime()).isEqualTo(at(1, 13, 0));
         assertThat(response.getTotalPrice()).isEqualTo(30000);
+        assertThat(response.getReservedAt()).isNotNull();
         assertThat(response.getSeats())
                 .extracting(
                         ReservationSeatResponse::getSeatId,

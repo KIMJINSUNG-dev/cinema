@@ -7,6 +7,9 @@
  * -2026-10-15: ShowtimeController 작성에 따른 filterChain() 메서드에의 권한 체계 추가
  * -2026-10-15: filterChain() 메서드 권한 처리를 denyAll() 기반으로 재정비
  * -2026-10-30: ReservationController 작성에 따른 filterChain() 메서드에의 권한 체계 추가
+ * -2026-10-31: 예매 내역 조회 · 취소 API 권한 추가
+ *              GET /api/reservations/*가 /api/reservations/me와도 일치하므로(D-34와 같은 문제),
+ *              고객용 /me 규칙(GET · PATCH)을 직원용 규칙보다 위에 둠
  ***/
 package com.cinema.backend.global.config;
 
@@ -68,7 +71,9 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/api/members/myinfo"
+                                "/api/members/myinfo",
+                                "/api/reservations/me",
+                                "/api/reservations/me/*"
                         ).hasAnyRole("CUSTOMER")
                         .requestMatchers(
                                 HttpMethod.POST,
@@ -78,7 +83,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.PATCH,
                                 "/api/members/*/nickname",
-                                "/api/members/*/withdraw"
+                                "/api/members/*/withdraw",
+                                "/api/reservations/me/*/cancel"
                         ).hasAnyRole("CUSTOMER")
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -87,7 +93,13 @@ public class SecurityConfig {
                                 "/api/showtimes/**",
                                 "/api/members/*",
                                 "/api/members/by-email/*",
-                                "/api/members/by-nickname/*"
+                                "/api/members/by-nickname/*",
+                                "/api/reservations",
+                                "/api/reservations/*"
+                        ).hasAnyRole("STAFF")
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/reservations/*/cancel"
                         ).hasAnyRole("STAFF")
                         .requestMatchers(
                                 HttpMethod.GET,
