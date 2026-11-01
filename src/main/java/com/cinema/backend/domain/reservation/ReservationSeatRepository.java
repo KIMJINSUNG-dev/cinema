@@ -5,6 +5,8 @@
  * -2026-10-28: 예매 기능 구현을 위한 메서드 작성
  *              -countByShowtimeIdAndSeatIdAndActiveTrue
  *              -existsByShowtimeIdAndSeatIdAndActiveTrue
+ * -2026-11-01: 상영 일정 변경 제한을 위한 메서드 작성
+ *              -existsByShowtimeIdAndActiveTrue
  ***/
 package com.cinema.backend.domain.reservation;
 
@@ -14,4 +16,5 @@ public interface ReservationSeatRepository extends JpaRepository<ReservationSeat
 
     long countByShowtimeIdAndSeatIdAndActiveTrue(Long showtimeId, Long seatId);
     boolean existsByShowtimeIdAndSeatIdAndActiveTrue(Long showtimeId, Long seatId);
+    boolean existsByShowtimeIdAndActiveTrue(Long showtimeId);
 }
