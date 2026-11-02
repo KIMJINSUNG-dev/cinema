@@ -3,7 +3,7 @@
  * 작성이력
  * -2026-10-28: 파일 생성 및 작성
  * -2026-11-02: 잘못된 정렬 파라미터 전달 시 의도한 응답 및 메시지를 반환하는지,
- *              DB 오류 메시지를 포함하지 않았는지 확인하는
+ *              엔티티 구조를 메시지에 포함하지 않았는지 확인하는
  *              handlePropertyReferenceExceptionTest 추가
  ***/
 package com.cinema.backend.global.exception;
@@ -44,7 +44,7 @@ public class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("PropertyReferenceException은 400 및 고정 메시지 반환, DB 오류 메시지는 노출하지 않음")
+    @DisplayName("PropertyReferenceException은 400 및 고정 메시지 반환, 엔티티 구조는 노출하지 않음")
     public void handlePropertyReferenceExceptionTest() {
 
         String wrongPropertyName = "wrongPropertyName";
