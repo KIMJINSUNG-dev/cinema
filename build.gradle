@@ -24,6 +24,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	implementation 'io.github.openfeign.querydsl:querydsl-jpa:7.5'
+	annotationProcessor 'io.github.openfeign.querydsl:querydsl-apt:7.5:jpa'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
