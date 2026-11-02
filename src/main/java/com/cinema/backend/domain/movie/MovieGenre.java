@@ -4,6 +4,7 @@
  * -2026-09-02: 파일 생성 및 작성
  * -2026-09-03: BaseEntity 상속 추가
  * -2026-10-08: 외부에서 기본 생성자로 빈 엔티티를 생성하지 못하도록 @NoArgsConstructor를 protected로 제한
+ * -2026-11-02: movie, genre 필드에 nullable = false 적용
  ***/
 package com.cinema.backend.domain.movie;
 
@@ -38,10 +39,10 @@ public class MovieGenre extends BaseEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "movie_id")
+    @JoinColumn(name = "movie_id", nullable = false)
     private Movie movie;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "genre_id")
+    @JoinColumn(name = "genre_id", nullable = false)
     private Genre genre;
 }
