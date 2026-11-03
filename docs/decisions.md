@@ -1,6 +1,6 @@
 # Cinema 설계 결정 기록
 
-> 최초 작성: 2026-10-01 · 최종 수정: 2026-11-02
+> 최초 작성: 2026-10-01 · 최종 수정: 2026-11-03
 
 Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 새 결정이 생기거나 기존 결정이 바뀌면 이 문서에 추가하고, 바뀐 결정은 지우지 않고 변경 내역을 남깁니다.
@@ -60,6 +60,7 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 - **근거**: 중간 테이블에 추가 정보(예: 좌석별 결제 금액)를 담을 수 있고, 연결 자체를 명시적으로 다룰 수 있다.
 - **검토한 대안**: `@ManyToMany` — 중간 테이블에 컬럼을 추가할 수 없음.
 - **보완 (2026-11-02)**: `MovieGenre`의 영화 · 장르 연관관계에 `@JoinColumn(nullable = false)`를 추가하고, 개발 DB의 `movie_genres.movie_id` · `genre_id`를 `ALTER TABLE ... MODIFY ... NOT NULL`로 직접 변경했다(`ddl-auto=update`는 기존 컬럼의 NULL 허용 여부를 바꾸지 않음, 변경 전 NULL 행 0건 확인). 생성자의 null 검사(Java)와 DB 제약의 이중 방어로, 장르가 NULL인 행이 생기면 영화 조회의 장르 이름 변환에서 `NullPointerException`(500)이 나는 문제를 막는다. 테스트 · 배포용 DB는 엔티티 기준으로 생성되므로 이 설정이 실제 제약이 된다.
+- **보완 (2026-11-03, "삭제 후 재생성"의 실행 순서)**: `updateMovie()`에서 기존 장르와 하나라도 겹치는 장르로 수정하면 `(movie_id, genre_id)` 유니크 제약 위반(409)이 났다. IDENTITY 전략의 `save()`는 INSERT를 **즉시** 실행하지만 `deleteAll()`의 DELETE는 **플러시까지 지연**되어, 아직 지워지지 않은 기존 행과 충돌한 것이다. `deleteAll()` 직후 `movieGenreRepository.flush()`로 DELETE를 먼저 반영해 해결했다(커밋이 아니므로 이후 예외 시 함께 롤백된다). 장르는 영화당 몇 개라 바뀐 것만 추가 · 삭제하는 방식(차집합)이나 JPQL 일괄 삭제(D-37 규칙 2 예외 필요)는 택하지 않았다. 검색 테스트 작성 중 Claude Code가 발견해 수정하지 않고 보고했으며, 회귀 테스트 `MovieUpdateGenreTest` 5개 [AI 초안]로 수정 전 실패(동일 · 일부 겹침 2건) → 수정 후 통과를 확인했다. 자세한 과정은 `troubleshooting.md` 3번.
 
 ### D-08. 결제 금액은 ReservationSeat에 저장
 
@@ -547,6 +548,37 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
     - 남은 검토(10단계): 지금은 엔티티의 어떤 속성으로도 정렬할 수 있다(예: `member.email`). 더 엄격하게 하려면 허용할 정렬 필드만 정하는 방식을 검토한다.
   - 이미 취소된 예약을 마감 이후에 다시 취소하면 마감 검사가 먼저라 "취소 가능 시간이 지난 예약입니다"가 나온다(둘 다 409). 상태 판단이 엔티티 `cancel()` 안에 있어 순서를 바꾸려면 구조 변경이 필요하므로 낮은 우선순위로 둔다.
 
+## 13. 조회 · 검색 (4단계, QueryDSL)
+
+### D-48. 영화 목록은 QueryDSL 동적 검색 API 하나로 통합하고, 공개 영화만 · 고정 정렬로 조회 (2026-11-03)
+
+- **결정**: 
+  - `GET /api/movies?keyword=&genreId=&movieStatus=&page=&size=` 하나로 목록과 검색을 처리한다. 세 조건은 **모두 선택**이고 함께 주면 AND로 묶는다.
+    - `keyword`: 영화 이름 부분 일치, 대소문자 무시. 공백 문자열은 조건 없음으로 취급(`StringUtils.hasText`)
+    - `genreId`: 장르 1개. 존재하지 않는 장르면 400이 아니라 **빈 페이지**(검색 조건일 뿐이므로)
+    - `movieStatus`: `@RequestParam`에서 `Movie.MovieStatus` enum으로 바로 받는다. 잘못된 값은 기존 타입 불일치 처리기가 400("요청 파라미터의 형식이 올바르지 않습니다: movieStatus")으로 응답한다. 노출되는 것은 공개 파라미터 이름뿐이다.
+  - **공개 영화(`DisplayStatus.ACTIVE`)만** 조회한다. 숨긴 영화까지 보는 검색은 9단계 관리자 화면에서 다룬다.
+  - 정렬은 **`createdAt DESC, id DESC`로 고정**한다(`id`는 생성 시각이 같을 때의 보조 기준). QueryDSL은 `Pageable`의 정렬을 자동 적용하지 않으므로 `?sort=` 파라미터는 **무시**된다(오류 없음). 컨트롤러의 `@PageableDefault`에서는 `sort`를 뺐다.
+  - 장르 조건은 조인이 아니라 **서브쿼리**로 거른다: `movie.id IN (SELECT mg.movie_id FROM movie_genres mg WHERE mg.genre_id = ?)`.
+  - 구조: `MovieRepositoryCustom`(메서드 선언) + `MovieRepositoryCustomImpl`(QueryDSL 구현)을 `MovieRepository`가 함께 상속한다. 서비스는 `MovieRepository` 하나만 주입받는다.
+- **근거**: 
+  - 기존에는 검색어가 없으면 `findAll()`(공개 여부 조건 없음), 있으면 `findByName...AndDisplayStatus`로 경로가 둘이었고, **검색어 없는 목록에서 비공개 영화가 노출**되고 있었다(`Movie`의 기본값이 `DEACTIVATED`라 등록만 한 영화가 그대로 보임). 경로를 하나로 합치면 공개 조건을 빠뜨릴 곳이 없어진다.
+  - 조건 3개의 조합(8가지)을 메서드 이름 기반 쿼리로 만들 수 없다. QueryDSL에서는 조건 메서드가 값이 없을 때 `null`을 돌려주면 `where()`가 그 조건을 무시하므로 쿼리 하나로 처리된다.
+  - 고정 정렬은 기존 기본 정렬(생성 일시 최신순)과 같아 동작이 바뀌지 않고, 정렬 필드 노출 문제(D-47 보류)도 생기지 않는다.
+  - 서브쿼리는 장르 조건을 "장르 여러 개 중 하나"로 늘려도 영화가 여러 줄로 나오지 않아, 페이지 크기 · 전체 개수가 어긋나지 않는다.
+- **검토한 대안**: 
+  - `movie_genres` 조인 + `distinct` — 지금(장르 1개)은 중복이 없지만 조건을 늘리면 중복 · 개수 불일치가 생길 수 있음.
+  - `Pageable`의 정렬을 `OrderSpecifier`로 변환해 적용 — 허용 정렬 필드 목록이 필요해 10단계 정렬 정비와 함께 검토.
+- **구현 메모**: 
+  - 구현 클래스 이름은 **인터페이스 이름 + `Impl`**(`MovieRepositoryCustomImpl`)이어야 Spring Data가 연결한다. 예전 방식(`MovieRepositoryImpl`)도 동작하지만 지금은 이 방식이 권장된다. `@Component`는 붙이지 않는다.
+  - 개수 쿼리는 `select(movie.count())`로 따로 만들고 `PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne)`로 넘긴다. 첫 페이지가 페이지 크기보다 적게 나오는 경우처럼 개수를 알 수 있으면 개수 쿼리를 생략한다. `fetchCount()`는 폐기 예정이라 쓰지 않는다.
+  - 서브쿼리는 `queryFactory`가 아니라 `JPAExpressions.select(...).from(...).where(...)`로 만든다(실행하지 않는 쿼리 조각). 바깥 조건의 주어는 바깥 쿼리의 대상(`QMovie.movie.id`)이어야 한다.
+- **구현 · 검증** [직접 구현]: `MovieService`의 `findAll()` · `findByName()`을 `searchMovies()`로 통합하고, 쓰이지 않게 된 `MovieRepository.findByNameContainingIgnoreCaseAndDisplayStatus()`를 삭제했다. `MovieSearchTest` 11개 [AI 초안](조건별 · 조합, 공개 범위, 공백 검색어, 장르 2개 영화의 중복 없음 · 개수 1, 없는 장르 빈 페이지, 정렬, 페이징, 장르 이름 응답). Postman 11건 확인. 전체 테스트 109개.
+- **비용**: 목록의 영화마다 `movie_genres`를 조회하고, `MovieGenre → Genre` 지연 로딩으로 장르마다 `genres`도 조회한다(N+1). 개선 전후 쿼리 수를 기록하면서 4단계에서 개선한다(11/4 예정).
+- **보류**: 
+  - `GET /api/movies/{id}`도 공개 여부를 확인하지 않아 id를 알면 숨긴 영화를 조회할 수 있다(9단계).
+  - 목록이 공개 영화로 제한되어, 숨긴 영화 목록은 9단계 관리자 화면 전까지 API로 볼 수 없다(9단계).
+
 ---
 
 ## 변경 이력
@@ -574,3 +606,4 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 | 2026-10-31 | 예매 내역 조회 · 취소 결정 D-47 추가, D-43에 직원 예약 API 구현(공통 로직 추출 · 처리 직원 DB 재확인 · 시스템 계정 초기화) 기록 |
 | 2026-11-01 | D-44 구현 기록(활성 예약 판단 기준, 잠금 순서 규칙, READ_COMMITTED, 상태 비교 방식, 의도적 실패 실험) |
 | 2026-11-02 | 보류 항목 정리: D-46(AuthService 탈퇴 확인 결과 · 타이밍 공격 보류), D-47(정렬 파라미터 400 해결), D-07(MovieGenre NOT NULL), D-15(Redis deprecated API 대체), D-21(QueryDSL 7.5 설정) |
+| 2026-11-03 | 영화 동적 검색 결정 D-48 추가(검색 API 통합, 공개 영화만, 고정 정렬, 장르 서브쿼리, 비공개 영화 노출 해결), D-07 보완(장르 재연결 시 지연 DELETE와 즉시 INSERT 충돌 → flush) |
