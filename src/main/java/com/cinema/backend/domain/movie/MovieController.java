@@ -4,6 +4,8 @@
  * -2026-09-08: 파일 생성 및 작성
  * -2026-09-09: 영화에 종속되는 장르 구현 작업
  * -2026-10-14: createMovie(), updateMovie() 메서드에 runningTime 반영
+ * -2026-11-03: MovieService.java의 메서드 구조 변경(findAll(), findByName() -> searchMovies())에 따라
+ *              searchMovies() 메서드 구조 변경
  ***/
 package com.cinema.backend.domain.movie;
 
@@ -13,7 +15,6 @@ import com.cinema.backend.domain.movie.dto.MovieUpdateRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,15 +46,12 @@ public class MovieController {
     @GetMapping
     public ResponseEntity<Page<MovieResponse>> searchMovies(
             @RequestParam(required = false) String keyword,
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+            @RequestParam(required = false) Long genreId,
+            @RequestParam(required = false) Movie.MovieStatus movieStatus,
+            @PageableDefault(size = 10) Pageable pageable
     ) {
 
-        if (keyword != null && !keyword.isBlank()) {
-
-            return ResponseEntity.ok(movieService.findByName(keyword, pageable));
-        }
-
-        return ResponseEntity.ok(movieService.findAll(pageable));
+        return ResponseEntity.ok(movieService.searchMovies(keyword, genreId, movieStatus, pageable));
     }
 
     @GetMapping("/{id}")

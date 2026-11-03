@@ -4,6 +4,7 @@
  * -2026-09-08: 파일 생성 및 작성
  * -2026-09-09: 영화에 종속되는 장르 구현 작업
  * -2026-10-14: createMovie(), updateMovie() 메서드에 runningTime 반영
+ * -2026-11-03: QueryDSL 적용에 따라 findAll(), findByName() 메서드를 searchMovies() 메서드로 리워크
  ***/
 package com.cinema.backend.domain.movie;
 
@@ -62,9 +63,13 @@ public class MovieService {
     }
 
     @Transactional(readOnly = true)
-    public Page<MovieResponse> findAll(Pageable pageable) {
+    public Page<MovieResponse> searchMovies(
+            String keyword,
+            Long genreId,
+            Movie.MovieStatus movieStatus,
+            Pageable pageable) {
 
-        return movieRepository.findAll(pageable)
+        return movieRepository.search(keyword, genreId, movieStatus, pageable)
                 .map(movie -> new MovieResponse(
                         movie,
                         toGenreNames(movieGenreRepository.findByMovieId(movie.getId()))
@@ -80,17 +85,6 @@ public class MovieService {
         return new MovieResponse(
                 movie,
                 toGenreNames(movieGenreRepository.findByMovieId(movie.getId())));
-    }
-
-    @Transactional(readOnly = true)
-    public Page<MovieResponse> findByName(String name, Pageable pageable) {
-
-        return movieRepository.findByNameContainingIgnoreCaseAndDisplayStatus(
-                name, Movie.DisplayStatus.ACTIVE, pageable)
-            .map(movie -> new MovieResponse(
-                    movie,
-                    toGenreNames(movieGenreRepository.findByMovieId(movie.getId()))
-            ));
     }
 
     @Transactional
