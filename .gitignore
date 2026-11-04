@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# JVM 비정상 종료 진단 파일
+hs_err_pid*.log
+replay_pid*.log
