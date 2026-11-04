@@ -7,6 +7,8 @@
  * -2026-11-03: QueryDSL 적용에 따라 findAll(), findByName() 메서드를 searchMovies() 메서드로 리워크
  * -2026-11-03: updateMovie()에서 기존 장르와 겹치는 장르로 수정 시 유니크 제약 위반(409)이 발생하는 버그 수정
  *              (IDENTITY 즉시 INSERT가 지연된 DELETE보다 먼저 실행되던 문제 → deleteAll() 직후 flush() 추가)
+ * -2026-11-04: N+1 문제를 해결하기 위해 searchMovies() 메서드 구조를
+ *              movieGenreRepository.findAllWithGenreByMovieIdIn() 기반으로 리워크
  ***/
 package com.cinema.backend.domain.movie;
 
@@ -20,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -71,11 +75,28 @@ public class MovieService {
             Movie.MovieStatus movieStatus,
             Pageable pageable) {
 
-        return movieRepository.search(keyword, genreId, movieStatus, pageable)
-                .map(movie -> new MovieResponse(
-                        movie,
-                        toGenreNames(movieGenreRepository.findByMovieId(movie.getId()))
-                ));
+        Page<Movie> page = movieRepository.search(keyword, genreId, movieStatus, pageable);
+        List<Long> movieIdList = page.getContent().stream().map(Movie::getId).toList();
+
+        Map<Long, List<MovieGenre>> movieGenresByMovieId;
+
+        if (movieIdList.isEmpty()) {
+            
+            movieGenresByMovieId = Map.of();
+        } else {
+
+            movieGenresByMovieId = movieGenreRepository
+                    .findAllWithGenreByMovieIdIn(movieIdList)
+                    .stream()
+                    .collect(Collectors.groupingBy(
+                            mg -> mg.getMovie().getId()
+                    ));
+        }
+
+        return page.map(movie -> new MovieResponse(
+                movie,
+                toGenreNames(movieGenresByMovieId.getOrDefault(movie.getId(), List.of()))
+        ));
     }
 
     @Transactional(readOnly = true)
