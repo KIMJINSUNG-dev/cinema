@@ -208,6 +208,36 @@ class MovieSearchTest {
                 .containsExactlyInAnyOrder("SRCH11 장르X", "SRCH11 장르Y");
     }
 
+    @Test
+    @DisplayName("장르가 연결되지 않은 영화의 genreNames는 null이 아니라 빈 목록이다")
+    void movieWithoutGenre_genreNamesIsEmptyListNotNull() {
+
+        createActiveMovie("SRCH12 장르없는영화", null, Movie.MovieStatus.UPCOMING);
+
+        Page<MovieResponse> page = movieService.searchMovies("SRCH12", null, null, PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).hasSize(1);
+        assertThat(page.getContent().get(0).getGenreNames())
+                .isNotNull()
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("범위를 넘는 페이지를 요청하면 content는 비어 있고 totalElements · totalPages는 실제 값을 유지한다")
+    void pageOutOfRange_emptyContent_keepsTotalElementsAndTotalPages() {
+
+        for (int i = 1; i <= 3; i++) {
+
+            createActiveMovie("SRCH13 Movie" + i, null, Movie.MovieStatus.UPCOMING);
+        }
+
+        Page<MovieResponse> page = movieService.searchMovies("SRCH13", null, null, PageRequest.of(5, 2));
+
+        assertThat(page.getContent()).isEmpty();
+        assertThat(page.getTotalElements()).isEqualTo(3);
+        assertThat(page.getTotalPages()).isEqualTo(2);
+    }
+
     // Movie의 displayStatus 기본값은 DEACTIVATED이므로, 생성 후 updateMovie()로 ACTIVE로 전환한다.
     private Long createActiveMovie(String name, List<Long> genreIds, Movie.MovieStatus movieStatus) {
 
