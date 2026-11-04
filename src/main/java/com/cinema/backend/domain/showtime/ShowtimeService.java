@@ -9,6 +9,8 @@
  *              -상영정보 · 상영관을 잠그기 위해 findByIdForUpdate() 사용(기존 findById() 메서드도 대체)
  *              -SELECT시 최신 데이터를 참조하기 위해 트랜잭션에 isolation = Isolation.READ_COMMITTED 적용
  *              -예매정보가 존재하는 경우 409(ConflictException) 예외 처리
+ * -2026-11-04: 고객용 상영시간표 조회 메서드 findTimetable() 추가 (ShowtimeRepositoryCustom.findTimetable() 사용)
+ *              -현재 시각은 서비스에서 구해 리포지토리에 넘김 (리포지토리가 직접 LocalDateTime.now()를 호출하지 않음)
  ***/
 package com.cinema.backend.domain.showtime;
 
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -83,6 +86,20 @@ public class ShowtimeService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상영관입니다."));
 
         return showtimeRepository.findByScreenOrderByStartTimeAsc(screen)
+                .stream()
+                .map(ShowtimeResponse::new)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeResponse> findTimetable(LocalDate date, Long movieId, Long screenId) {
+
+        if (date == null) {
+
+            throw new IllegalArgumentException("조회 날짜는 비워둘 수 없습니다.");
+        }
+
+        return showtimeRepository.findTimetable(date, movieId, screenId, LocalDateTime.now())
                 .stream()
                 .map(ShowtimeResponse::new)
                 .toList();

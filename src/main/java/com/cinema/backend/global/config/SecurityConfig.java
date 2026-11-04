@@ -11,6 +11,9 @@
  *              GET /api/reservations/*가 /api/reservations/me와도 일치하므로(D-34와 같은 문제),
  *              고객용 /me 규칙(GET · PATCH)을 직원용 규칙보다 위에 둠
  * -2026-10-31: 직원 예약(회원 대리 예약 · 현장 판매) API 권한 추가 (D-43)
+ * -2026-11-04: 고객용 상영시간표 조회(GET /api/showtimes/timetable) permitAll 추가.
+ *              GET /api/showtimes/**가 STAFF 전용이라(D-34와 같은 문제), 비로그인 허용 규칙을
+ *              그보다 앞선 permitAll 블록(movies와 함께)에 둬서 먼저 매칭되게 함
  ***/
 package com.cinema.backend.global.config;
 
@@ -68,7 +71,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/movies",
-                                "/api/movies/*"
+                                "/api/movies/*",
+                                "/api/showtimes/timetable"
                         ).permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,

@@ -2,6 +2,9 @@
  * 프론트엔드의 API 요청에 따라 ShowtimeService.java의 서비스 메서드를 호출하는 컨트롤러 클래스
  * 작성이력
  * -2026-10-15: 파일 생성 및 작성 (SeatGradeController.java 구조 참고)
+ * -2026-11-04: 고객용 상영시간표 조회(getTimetable, GET /api/showtimes/timetable) 추가
+ * -2026-11-04: getTimetable()의 date를 필수 파라미터로 변경 (누락 시 MissingServletRequestParameterException
+ *              → GlobalExceptionHandler가 400으로 처리. ShowtimeService의 null 검사는 방어용으로 유지)
  *
  * 상영관별 목록 조회는 screenId를 필수 쿼리 파라미터로 받는다.
  * (상영관 하나를 지정하지 않은 전체 조회는 현재 범위에 없음)
@@ -13,10 +16,12 @@ import com.cinema.backend.domain.showtime.dto.ShowtimeResponse;
 import com.cinema.backend.domain.showtime.dto.ShowtimeStatusUpdateRequest;
 import com.cinema.backend.domain.showtime.dto.ShowtimeUpdateRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -46,6 +51,17 @@ public class ShowtimeController {
     ) {
 
         return ResponseEntity.ok(showtimeService.findByScreenId(screenId));
+    }
+
+    @GetMapping("/timetable")
+    public ResponseEntity<List<ShowtimeResponse>> getTimetable(
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) Long movieId,
+            @RequestParam(required = false) Long screenId
+    ) {
+
+        return ResponseEntity.ok(showtimeService.findTimetable(date, movieId, screenId));
     }
 
     @GetMapping("/{id}")
