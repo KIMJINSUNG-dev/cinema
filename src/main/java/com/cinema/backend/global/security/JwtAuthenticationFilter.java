@@ -2,6 +2,7 @@
  * 프론트엔드의 모든 API 요청에서 Header의 Token 부분을 추출해 검증하는 필터 클래스
  * 작성이력
  * -2026-09-11: 파일 생성 및 작성
+ * -2026-11-09: JwtProvider.validateToken() 리턴 타입 변경에 따른 doFilterInternal() 메서드 구조 변경
  ***/
 package com.cinema.backend.global.security;
 
@@ -33,7 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = extractToken(request);
 
-        if (token != null && jwtProvider.validateToken(token)) {
+        if (token != null && jwtProvider.validateToken(token) == TokenStatus.VALID) {
 
             String email = jwtProvider.getEmailFromToken(token);
             String role = jwtProvider.getRoleFromToken(token);

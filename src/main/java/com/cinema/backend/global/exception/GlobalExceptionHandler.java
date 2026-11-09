@@ -14,6 +14,7 @@
  * -2026-10-28: DataIntegrityViolationException 핸들러 추가 및
  *              내부 메시지가 외부에 노출되지 않도록 작업, 개발자는 확인할 수 있도록 log.warn() 코드 추가
  * -2026-11-02: PropertyReferenceException 핸들러 추가
+ * -2026-11-09: UnauthorizedException, TooManyRequestsException, MissingRequestCookieException 핸들러 추가
  ***/
 package com.cinema.backend.global.exception;
 
@@ -24,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MissingRequestCookieException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -43,6 +45,25 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleConflictException(ConflictException e) {
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<String> handleUnauthorizedException(UnauthorizedException e) {
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<String> handleTooManyRequestsException(TooManyRequestsException e) {
+
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(e.getMessage());
+    }
+
+    @ExceptionHandler(MissingRequestCookieException.class)
+    public ResponseEntity<String> handleMissingRequestCookieException(MissingRequestCookieException e) {
+
+        // 응답 메시지는 고정 메시지로 AuthService의 TOKEN_REISSUE_FAILED_MESSAGE 필드와 똑같은 메시지로 유지할 것
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("토큰 재발급에 실패했습니다.");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

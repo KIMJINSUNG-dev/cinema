@@ -2,10 +2,13 @@
  * 로그인 과정의 토큰 생성 및 검증, 역분석을 담당하는 클래스
  * 작성이력
  * -2026-09-10: 파일 생성 및 작성
+ * -2026-11-09: validateToken() 메서드를 boolean 반환에서 TokenStatus를 반환하는 방식으로 리워크
  ***/
 package com.cinema.backend.global.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
@@ -56,7 +59,7 @@ public class JwtProvider {
                 .compact();
     }
 
-    public boolean validateToken(String token) {
+    public TokenStatus validateToken(String token) {
 
         try {
 
@@ -64,11 +67,15 @@ public class JwtProvider {
                     .verifyWith(secretKey)
                     .build()
                     .parseSignedClaims(token);
-            return true;
-        } catch (Exception e) {
+            return TokenStatus.VALID;
+        } catch (ExpiredJwtException e) {
 
-            log.warn("유효하지 않은 JWT 토큰: {}", e.getMessage());
-            return false;
+            log.debug("만료된 토큰");
+            return TokenStatus.EXPIRED;
+        } catch (JwtException | IllegalArgumentException e) {
+
+            log.warn("유효하지 않은 토큰: {}", e.getClass().getSimpleName());
+            return TokenStatus.INVALID;
         }
     }
 
