@@ -10,6 +10,7 @@
  * -2026-11-04: findByScreenOrderByStartTimeAsc()의 N+1(영화 지연 로딩)을 줄이기 위해
  *              영화를 join fetch로 함께 조회하도록 변경 (상영관은 호출부에서 이미 조회해
  *              영속성 컨텍스트에 있으므로 fetch join 대상에서 제외)
+ * -2026-11-11: findWithMovieAndScreenById() 메서드 추가 (고객용 좌석 조회 API 제공을 위한 메서드)
  ***/
 package com.cinema.backend.domain.showtime;
 
@@ -44,4 +45,7 @@ public interface ShowtimeRepository extends JpaRepository<Showtime, Long>, Showt
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from Showtime s where s.id = :id")
     Optional<Showtime> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("select s from Showtime s join fetch s.movie join fetch s.screen where s.id = :id")
+    Optional<Showtime> findWithMovieAndScreenById(@Param("id") Long id);
 }
