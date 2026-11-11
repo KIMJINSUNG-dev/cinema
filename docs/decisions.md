@@ -1,6 +1,6 @@
 # Cinema 설계 결정 기록
 
-> 최초 작성: 2026-10-01 · 최종 수정: 2026-11-09
+> 최초 작성: 2026-10-01 · 최종 수정: 2026-11-11
 
 Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 새 결정이 생기거나 기존 결정이 바뀌면 이 문서에 추가하고, 바뀐 결정은 지우지 않고 변경 내역을 남깁니다.
@@ -646,6 +646,7 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
   - 실제 요청 로그에서 `members ... where email=?`가 서비스 조회 외에 **한 번 더** 나간다(요청당 고정 1건, N+1은 아님). 출처(JWT 필터 등)를 OSIV 검토 때 함께 확인한다.
     - **확인 결과 (2026-11-06, 문제없음)**: `JwtAuthenticationFilter` · `JwtProvider` · 컨트롤러에는 DB 조회가 없다. 서버 재시작 직후 토큰을 받으려고 보낸 **로그인 요청의 조회**가 같은 로그에 섞인 것이었다(두 요청의 처리 스레드 `exec-1` · `exec-10`과 시각이 다름). 로그인 후 `/me`만 다시 보내 회원 조회 1건 · 전체 4건을 확인했다. `show-sql` 로그에는 요청 구분이 없으므로 쿼리 수는 요청 하나만 보낸 상태에서 센다.
   - `Page`를 그대로 JSON으로 내보내 `PageImpl` 직렬화 경고(WARN)가 난다(D-47부터). `@EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)`로 바꾸면 응답 JSON 모양이 바뀌므로 5단계 화면 작업 전에 결정한다.
+    - **해결 (2026-11-11)**: Spring Data 표준 형식(`VIA_DTO`)으로 고정했다(D-54).
 
 ### D-52. OSIV(`spring.jpa.open-in-view`)는 끈다 (2026-11-06)
 
@@ -663,7 +664,7 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 - **보류 (10단계)**: 테스트 트랜잭션 없이 실제 HTTP 요청처럼 호출하는 테스트(MockMvc 등)가 있으면 이런 설정 변경을 자동으로 검증할 수 있다. 통합 테스트 보강 때 후보로 검토한다.
 
 
-## 14. 인증 실패 응답 (5단계 착수 전)
+## 14. 5단계 착수 전 API 정리 (인증 실패 응답 · 목록 응답 형식 · 고객용 좌석 조회)
 
 ### D-53. 인증 실패는 401 · 요청 횟수 초과는 429, 토큰 검증은 만료 · 무효를 구분한다 (2026-11-09)
 
@@ -681,10 +682,63 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
   - 재발급은 **토큰 검증을 이메일 추출보다 먼저** 한다. `getEmailFromToken()`도 서명을 검증하며 파싱하므로, 검증 전에 부르면 만료 · 위조 토큰에서 예외가 그대로 터져 500이 된다. 구현 중 실제로 이 순서 때문에 위조 토큰이 500을 낸 것을 Postman과 스택 트레이스(`AuthService` → `getEmailFromToken` → `SignatureException`)로 찾아 고쳤다. 검증 전에는 이메일을 믿을 수 없으므로 만료 · 무효 로그에는 `deviceId`만 남긴다.
   - 필터의 `token != null` 검사는 유지한다. 없으면 비로그인 요청마다 `INVALID` 경고 로그가 남는다.
   - `TokenStatus`는 값만 나타내는 독립 enum이고, 비밀 키를 쓰는 검증 로직은 `JwtProvider`에 둔다.
-- **검증** [직접 구현]: 전체 테스트 125개 통과(기존 테스트 영향 없음). Postman 8건 — 로그인 비밀번호 틀림 401 · 연속 실패 429 · 정상 재발급 200 · 쿠키 없음 401 · 서명 변조 401(로그 WARN 2줄) · 로그아웃 후 재발급 401 · 다른 deviceId 401 · 만료된 Access Token 401(실행 인자 `--jwt.access-expiration=10000`으로 10초 만료, 설정 파일 미수정) 후 재발급 → 새 토큰 200. 재발급 실패 시나리오 테스트는 [AI 초안]으로 추가 예정(11/10).
+- **검증** [직접 구현]: 전체 테스트 125개 통과(기존 테스트 영향 없음). Postman 8건 — 로그인 비밀번호 틀림 401 · 연속 실패 429 · 정상 재발급 200 · 쿠키 없음 401 · 서명 변조 401(로그 WARN 2줄) · 로그아웃 후 재발급 401 · 다른 deviceId 401 · 만료된 Access Token 401(실행 인자 `--jwt.access-expiration=10000`으로 10초 만료, 설정 파일 미수정) 후 재발급 → 새 토큰 200.
+- **테스트 (2026-11-11)** [AI 초안]: Spring · Redis 없이 실행하는 **단위 테스트** 21개. 테스트 환경 · CI에는 MySQL 컨테이너만 있고, Redis 컨테이너를 더하면 메모리 부담이 커서(트러블슈팅 4번) Redis 쪽(`RateLimitService` · `RefreshTokenService`)과 `MemberRepository` · `PasswordEncoder`는 mock으로 두었다. **`JwtProvider`는 실제 객체**를 쓴다(만료 · 위조 판정이 테스트의 핵심).
+  - `JwtProviderTest` 6개: 정상 `VALID`, 만료(만료 시간 음수) `EXPIRED`, 서명 변조 · 다른 키 · null/빈 값 · 형식 오류 `INVALID`(예외가 밖으로 나오지 않음).
+  - `AuthServiceTest` 12개: 로그인 5개(429, 회원 없음 · 탈퇴 · 비밀번호 불일치 같은 메시지 401, 성공 시 실패 기록 초기화 · Refresh Token 저장), 재발급 7개(정상 1 + 실패 6: 만료 · 서명 변조 · 회원 없음 · 탈퇴 · 저장된 토큰 없음 · 불일치, 모두 같은 고정 메시지 401). 만료 · 변조 토큰에서 **`verify(memberRepository, never()).findByEmail(any())`** 로 회원 조회가 호출되지 않음을 확인해 "검증 → 이메일 추출" 순서를 고정한다. `atLeastOnce()`로 뒤집어 해당 2개만 실패하는 것을 먼저 확인했다.
+  - `GlobalExceptionHandlerTest` +3개: 401 · 429 · 쿠키 없음 401(`MethodParameter`는 리플렉션으로 생성).
+  - 테스트용 비밀 키는 코드에 적지 않고 실행마다 `SecureRandom` 32바이트로 만든다(CLAUDE.md 보안 규칙).
+  - 리뷰에서 바로잡은 것: 서명 변조를 **마지막 글자**로 하면 간헐적으로 실패한다. HS256 서명 32바이트는 Base64URL 43글자(258비트)라 마지막 글자에는 데이터 4비트 + 버려지는 2비트가 있고, `A` → `B`처럼 버려지는 비트만 다른 글자로 바꾸면 디코딩 결과가 같아 `VALID`가 된다(키가 무작위라 약 1/16 확률). **가운데 글자**를 바꾸도록 고치고 이유를 주석으로 남겼다. 작성 이력 날짜 오기(11-10)도 수정. 전체 테스트 146개.
 - **보류**: 
   - Refresh Token 회전(재발급 시 Refresh Token도 교체) — 쿠키 재설정 · Redis 갱신 · 동시 재발급 처리까지 범위가 커서 6단계 보안 강화 후보로 둔다.
   - Refresh Token 쿠키의 `secure(false)` → 배포 시 `true`(HTTPS 전제).
+
+### D-54. 목록 API의 `Page` 응답은 Spring Data 표준 형식(`VIA_DTO`)으로 고정 (2026-11-11)
+
+- **결정**: `application.properties`에 `spring.data.web.pageable.serialization-mode=via-dto`를 추가한다. 컨트롤러 · 서비스는 그대로 `Page<...>`를 반환하고, JSON으로 바꾸는 단계에서 Spring Data가 표준 형태로 바꾼다.
+  - 응답: `content` + `page { size, number, totalElements, totalPages }`
+  - 영향 API: 영화 검색, 예매 내역 목록(고객용 · 직원용), 회원 전체 목록
+- **근거**: 
+  - 바꾸는 이유는 민감 정보가 아니라 **응답 구조의 안정성**이다. 기존 JSON은 백엔드가 설계한 구조가 아니라 Spring Data 내부 객체(`PageImpl`)를 Jackson이 그대로 펼친 것이고, 경고 문구대로 **라이브러리 버전을 올리기만 해도 모양이 바뀔 수 있다.** "화면 요구가 바뀌면 프론트엔드가 맞추고, 백엔드는 안정된 구조를 약속한다"는 원칙을 지키려면 백엔드 응답이 버전과 무관하게 고정되어야 한다.
+  - 기존 응답의 항목 중 독립적인 정보는 `content` · `size` · `number` · `totalElements` · `totalPages` 5개뿐이고, 나머지(`numberOfElements` · `first` · `last` · `empty` · `sort` · `pageable`의 `offset` · `paged`/`unpaged` 등)는 겹치거나 계산할 수 있다. 표준 형식은 정확히 이 5개만 남긴다.
+  - 프론트엔드 화면 작업 전이라 응답 모양을 바꾸는 비용이 지금 가장 적다.
+- **검토한 대안**: 
+  - 그대로 둠 — 작업은 없지만 경고가 남고, 버전 업그레이드 때 구조가 바뀔 위험이 남는다.
+  - 직접 만든 페이지 응답 DTO(`hasNext` 추가 등) — 가장 자유롭지만 클래스와 변환 코드가 늘어난다. 필요한 정보가 생기면 그때 검토한다.
+  - `@EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)` 어노테이션 — 같은 효과지만 설정 클래스를 건드리지 않는 설정 한 줄이 더 가벼워 설정 방식을 택했다.
+- **검증** [직접 구현]: Postman 3건(영화 목록, 고객 예매 내역, `?page=1&size=2`로 `page.number` · `page.size` 확인), 서버 로그에서 `PageImpl` 경고 사라짐 확인, 전체 테스트 146개 통과(서비스 테스트는 `Page` 객체를 직접 검사하므로 영향 없음).
+
+### D-55. 고객용 좌석 조회는 상영 일정 기준 · 비로그인 · 쿼리 3건 고정, 좌석 상태는 3가지로 내보낸다 (2026-11-11 설계, 구현 진행 중)
+
+- **결정**: 
+  - `GET /api/showtimes/{showtimeId}/seats` (**비로그인 허용**). `SecurityConfig`에서는 상영시간표(D-50)처럼 STAFF 전용 `GET /api/showtimes/**`보다 **앞**에 둔다.
+  - 상영시간표와 **같은 조건**(상영 일정 `ACTIVE` · 공개 영화 · 시작 전)을 만족할 때만 응답하고, 아니면 **409**. 메시지는 예약 생성(D-42)의 기존 409 응답과 맞춘다.
+  - 좌석 상태: `AVAILABLE`(선택 가능) · `RESERVED`(활성 예약 있음) · `UNAVAILABLE`(사용 중지 좌석). **누가 예약했는지는 내보내지 않는다.**
+  - 사용 중지 좌석도 목록에 **포함**한다(빼면 배치도에 구멍이 생기거나 행 · 열이 어긋남).
+  - 응답 `ShowtimeSeatsResponse`: `showtimeId`, `movieName`, `screenName`, `startTime`, `endTime`, `seats`. 좌석 `SeatAvailabilityResponse`: `seatId`, `seatCode`, `row`, `column`, `seatGradeName`, `price`(= 등급 기준 가격, D-42), `status`. 상태 enum은 DTO 안의 중첩 enum(`SeatAvailabilityStatus`). 정렬은 행 → 열.
+  - 쿼리 **3건 고정**(좌석 수와 무관):
+    1. `ShowtimeRepository.findWithMovieAndScreenById` — 상영 일정 + 영화 · 상영관 `join fetch`, `Optional`
+    2. `SeatRepository.findAllWithGradeByScreenId` — 상영관의 좌석 전체 + 등급 `join fetch`, `order by s.row, s.column`
+    3. `ReservationSeatRepository.findReservedSeatIdsByShowtimeId` — `select rs.seat.id ... where rs.showtime.id = :showtimeId and rs.active = true`, `List<Long>`
+    - 서비스는 ③을 `Set`으로 바꿔 좌석마다 `contains`로 대조한다.
+  - 락 없음(읽기 전용). 화면을 보는 사이 다른 사람이 예약한 경우는 예약 API가 다시 검사해 409로 막는다(D-39). 조회는 "현재 상태의 스냅샷"이면 충분하다.
+- **근거**: 
+  - 좌석 상태는 상영관이 아니라 **상영 일정마다** 다르다(같은 좌석도 10시 회차에는 예약됨, 14시 회차에는 빈 좌석). D-25에서 정한 "고객용 좌석 조회는 상영 일정 기준 별도 API"를 구현하는 것이다.
+  - 기존 관리용 `SeatResponse`를 재사용하지 않는다: 관리용은 좌석의 **관리 상태**(`Seat.SeatStatus`)를, 고객용은 **예매 가능 여부**를 보여 준다. 같은 "상태"라도 뜻이 달라 한 DTO에 섞으면 프론트엔드가 헷갈린다. 상영관 정보는 좌석마다 반복하지 않고 바깥 DTO에 한 번만 둔다. 가격 필드를 `basePrice`가 아니라 `price`로 둔 것은 이후 가격 규칙(조조 할인 등)이 생겨도 API 모양을 유지하기 위해서다.
+  - 쿼리 설계는 이번 주 기준 그대로다: 다대일은 fetch join(D-50 · D-51), 예약 여부는 좌석마다 묻지 않고 **한 번에 모아 대조**(D-49의 IN 일괄 조회와 같은 발상).
+  - 쿼리 ①은 조건 없이 **id로만** 찾는다. 조건을 WHERE에 넣으면 "없는 상영 일정"과 "이미 끝난 상영 일정"이 모두 빈 결과가 되어 서비스가 둘을 구분할 수 없다.
+  - 쿼리 ②는 상영관을 fetch하지 않는다. ①에서 같은 트랜잭션의 영속성 컨텍스트에 이미 있기 때문이다(D-50의 직원용 목록과 같은 이유). 사용 중지 좌석도 보여야 하므로 `seatStatus` 조건도 넣지 않는다. `row` · `column`이 숫자로 저장되어 `A10`이 `A2` 앞에 오는 문자열 정렬 문제가 없다.
+  - 쿼리 ③은 엔티티 대신 **값(좌석 id)만** 꺼내 영속성 컨텍스트 등록 · 변경 감지 비용이 없다. `seat.id` · `showtime.id`는 FK 컬럼이라 JOIN도 없다. 취소된 예약 좌석은 `active_flag`가 `null`이므로(D-40, 유니크 제약 때문) SQL의 `= true` 비교에서 UNKNOWN이 되어 자연스럽게 빠진다. 같은 이유로 "취소된 예약"을 찾을 때 `= false`를 쓰면 0건이 되므로 `is null`을 써야 한다. 유니크 제약 인덱스 `(showtime_id, seat_id, active_flag)`의 맨 앞 컬럼으로 거르므로 인덱스를 쓸 수 있다.
+  - 이름 규칙: 리포지토리 메서드는 "무엇과 함께 + 무엇으로 찾는지"를 이름에 담고(`findWithMovieAndScreenById`), 다른 엔티티의 id 파라미터는 `:id`가 아니라 `:screenId`처럼 쓴다. 반환하는 값이 무엇의 id인지도 이름에 맞춘다(`ReservationSeat.id`가 아니라 `Seat.id`이므로 `findReservedSeatIds...`). 모두 `Long`이라 잘못 넘겨도 컴파일러가 막아 주지 못하기 때문이다. `findById`는 `JpaRepository`의 기존 메서드를 덮어쓰므로 쓰지 않는다.
+- **검토한 대안**: 
+  - 좌석마다 예약 여부 조회(`existsBy...`) — 좌석 수만큼 쿼리가 나간다(N+1).
+  - 사용 중지 좌석 제외 — 배치도 모양이 깨진다.
+  - 작업 방식 [AI 초안] — 반나절 안쪽으로 끝낼 수 있었지만, 쿼리 작성 경험을 쌓기 위해 [직접 구현]으로 정하고 이틀(11/11 · 11/12)로 나눴다.
+- **구현 (1/2, 2026-11-11)** [직접 구현]: 리포지토리 쿼리 3개 + 응답 DTO 2개. 빌드 · 서버 기동(JPQL 검사) · 전체 테스트 146개 통과, 커밋 · CI 통과. 아직 호출하는 코드는 없다.
+- **11/12에 정할 것 · 할 것**: 
+  - 상영관 상태(`Screen.ActiveStatus`: `ACTIVE` · `MAINTENANCE` · `CLOSED`)가 `ACTIVE`가 아닐 때 409로 막을지. 상영시간표(D-50) · 예약 생성(D-42) 조건과 맞춰 결정한다(현재 둘 다 상영관 상태는 보지 않음).
+  - 좌석 등급이 비활성인 좌석의 상태: D-42는 등급 비활성을 예약 거부 조건으로 두지 않으므로(D-27: 비활성은 새 지정만 막음) `AVAILABLE`로 두는 것이 일관된다. 확인 후 확정.
+  - 서비스(조건 검사 → 409, 예약 좌석 `Set` 대조, 상태 결정) · 컨트롤러 · `SecurityConfig`, Postman, 테스트 [AI 초안](시나리오 + 쿼리 수 3건 고정).
 
 ---
 
@@ -718,3 +772,4 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 | 2026-11-05 | 예매 내역 목록 N+1 개선 D-51 추가(30 → 20 → 4건, @EntityGraph + 배치 크기, B안과 C안의 선택 기준), D-49 대안표에 D-51 연결 |
 | 2026-11-06 | OSIV 결정 D-52 추가(끔, 영속성 컨텍스트 개념 · 근거 · 실제 요청 검증), D-51 보류 항목(중복 회원 조회) 확인 결과 기록 — 로그인 요청 조회가 섞인 것, 문제없음 |
 | 2026-11-09 | 인증 실패 응답 결정 D-53 추가(14장 신설: 재발급 실패 · 쿠키 없음 401, 로그인 401 · 429, TokenStatus로 만료 · 무효 구분, 검증 순서 버그 기록) |
+| 2026-11-11 | D-53에 테스트 기록 추가(단위 테스트 21개, 회원 조회 미호출 검증, 서명 변조 위치 문제), `Page` 응답 형식 결정 D-54 추가(VIA_DTO, D-51 보류 해결), 고객용 좌석 조회 설계 D-55 추가(구현 1/2: 쿼리 3개 · 응답 DTO), 14장 제목을 5단계 착수 전 API 정리로 변경 |
