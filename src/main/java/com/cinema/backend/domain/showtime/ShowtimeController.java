@@ -5,16 +5,14 @@
  * -2026-11-04: 고객용 상영시간표 조회(getTimetable, GET /api/showtimes/timetable) 추가
  * -2026-11-04: getTimetable()의 date를 필수 파라미터로 변경 (누락 시 MissingServletRequestParameterException
  *              → GlobalExceptionHandler가 400으로 처리. ShowtimeService의 null 검사는 방어용으로 유지)
+ * -2026-11-13: 고객용 좌석 조회 메서드 getShowtimeSeats() 추가
  *
  * 상영관별 목록 조회는 screenId를 필수 쿼리 파라미터로 받는다.
  * (상영관 하나를 지정하지 않은 전체 조회는 현재 범위에 없음)
  ***/
 package com.cinema.backend.domain.showtime;
 
-import com.cinema.backend.domain.showtime.dto.ShowtimeCreateRequest;
-import com.cinema.backend.domain.showtime.dto.ShowtimeResponse;
-import com.cinema.backend.domain.showtime.dto.ShowtimeStatusUpdateRequest;
-import com.cinema.backend.domain.showtime.dto.ShowtimeUpdateRequest;
+import com.cinema.backend.domain.showtime.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -70,6 +68,14 @@ public class ShowtimeController {
     ) {
 
         return ResponseEntity.ok(showtimeService.findById(id));
+    }
+
+    @GetMapping("/{id}/seats")
+    public ResponseEntity<ShowtimeSeatsResponse> getShowtimeSeats(
+            @PathVariable Long id
+    ) {
+
+        return ResponseEntity.ok(showtimeService.findShowtimeSeats(id));
     }
 
     @PutMapping("/{id}")

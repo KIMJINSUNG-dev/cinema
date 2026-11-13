@@ -14,6 +14,9 @@
  * -2026-11-04: 고객용 상영시간표 조회(GET /api/showtimes/timetable) permitAll 추가.
  *              GET /api/showtimes/**가 STAFF 전용이라(D-34와 같은 문제), 비로그인 허용 규칙을
  *              그보다 앞선 permitAll 블록(movies와 함께)에 둬서 먼저 매칭되게 함
+ * -2026-11-13: 고객용 좌석 조회(GET /api/showtimes/{id}/seats) permitAll 추가.
+ *              GET /api/showtimes/**가 STAFF 전용이라(D-34와 같은 문제), 비로그인 허용 규칙을
+ *              그보다 앞선 permitAll 블록(movies와 함께)에 둬서 먼저 매칭되게 함
  ***/
 package com.cinema.backend.global.config;
 
@@ -72,7 +75,8 @@ public class SecurityConfig {
                                 HttpMethod.GET,
                                 "/api/movies",
                                 "/api/movies/*",
-                                "/api/showtimes/timetable"
+                                "/api/showtimes/timetable",
+                                "/api/showtimes/*/seats"
                         ).permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,
