@@ -19,6 +19,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          check-latest: true
 
       - name: Gradle 설정
         uses: gradle/actions/setup-gradle@v5
