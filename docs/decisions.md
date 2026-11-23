@@ -30,6 +30,7 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
   - 결정: 17.0.21+9(eMudhra 포함, Java4Shell 미포함)로 먼저 올렸다가 다시 올리는 대신, **Temurin 17.0.21.1(Java4Shell 수정, Windows x64)이 배포되면 한 번에 갱신**한다(개발자 판단: 로컬 전용 환경이라 두 번 갱신은 낭비). 11/18 기준 Adoptium 11월 릴리스 현황(adoptium/temurin #326)에서 JDK 17 Windows x64는 작업 시작 전.
   - 확인: **작업일 시작 점검마다** 배포 여부를 확인한다. **12/1까지** 배포되지 않으면 다른 OpenJDK 배포판으로 교체를 검토한다. 기준은 무료 · TCK 인증 · Java 17 장기 지원 · Windows 설치 파일 · 해당 패치 배포 여부이며, 후보는 Amazon Corretto, Azul Zulu, Microsoft Build of OpenJDK, BellSoft Liberica다. Oracle JDK 17(업데이트 라이선스 조건)과 Oracle OpenJDK 빌드(17 갱신 종료)는 제외한다. 교체 시 로컬 설치 · IDE SDK · `JAVA_HOME` · CI `distribution`을 함께 바꾼다.
   - 그 전에 외부에 노출해야 하는 Java 프로그램이 생기면 JVM 옵션 `-XX:-UseBASE64Intrinsics`로 완화한다. **배포 전과 6단계(외부 TLS 연결) 착수 전에는 수정판 적용이 필수**다.
+  - **11/23 적용 완료**: Windows x64용 Temurin `jdk-17.0.21.1+2`(11/20 배포)를 확인하고 로컬 JDK를 갱신(`java -version` 17.0.21.1+2, JAVA_HOME 갱신, IntelliJ Project SDK · Gradle JVM 교체, 서버 기동 · 전체 테스트 통과). 이전 17.0.15는 설치 시 같은 17 계열 업그레이드로 제거됨을 확인. CI는 `setup-java`가 러너에 미리 설치된 17을 그대로 쓸 수 있어 `check-latest: true`를 추가해 실행마다 최신 패치를 받도록 했고, 로그에서 17.0.21.1+2를 확인(커밋 `5dbd948`). **JDK 보안 보류 항목 종료.**
 
 ### D-02. 백엔드 · 프론트엔드 분리 레포
 
@@ -813,3 +814,4 @@ Cinema 개발 중 내린 설계 결정과 그 근거를 기록합니다.
 | 2026-11-14 | 문서 범위 안내 추가: 프론트엔드 결정은 frontend 레포 `docs/decisions.md`(F-xx)로 분리 |
 | 2026-11-15 | 15장 신설(프론트엔드 연동에 따른 API 변경), D-56 로그아웃 시 Refresh Token 쿠키 삭제 |
 | 2026-11-18 | D-01 보완: eMudhra 대응이 Temurin 17.0.21+9에 포함되어 있었음을 정정, Java4Shell(CVE-2026-114938) 영향 평가 · 갱신 방침(17.0.21.1 대기, 12/1 기한, 교체 검토 기준) |
+| 2026-11-23 | D-01 보완: Java4Shell 수정판(Temurin 17.0.21.1+2) 로컬 적용, CI `check-latest: true`, JDK 보안 보류 항목 종료 |
