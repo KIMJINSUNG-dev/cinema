@@ -5,6 +5,8 @@
  * - JwtProvider는 실제 객체를 사용해 토큰 발급 · 검증 로직까지 함께 검증함. 비밀 키는 테스트 실행마다 무작위 바이트로 생성
  * 작성이력
  * -2026-11-11: 파일 생성 및 작성
+ * -2026-11-24: 이메일 정규화(trim · 대소문자 통일) 적용에 따른 로그인 테스트 추가,
+ *              activeMember()에 member.getEmail() stub 추가(토큰 발급 · Refresh Token 저장에 사용됨)
  ***/
 package com.cinema.backend.domain.auth;
 
@@ -38,6 +40,8 @@ class AuthServiceTest {
     private static final long REFRESH_EXPIRATION = 1000L * 60 * 60 * 24 * 7;
 
     private static final String EMAIL = "test@test.com";
+    // 대소문자 · 앞뒤 공백이 섞인 입력 (정규화하면 EMAIL과 같아짐)
+    private static final String RAW_MIXED_CASE_EMAIL = " TEST@Test.com ";
     private static final String PASSWORD = "password";
     private static final String DEVICE_ID = "device-1";
 
@@ -99,6 +103,7 @@ class AuthServiceTest {
         when(member.getPassword()).thenReturn("encoded-password");
         when(member.getRole()).thenReturn(Member.Role.CUSTOMER);
         when(member.getNickname()).thenReturn("tester");
+        when(member.getEmail()).thenReturn(EMAIL);
         return member;
     }
 
@@ -176,6 +181,77 @@ class AuthServiceTest {
 
         verify(rateLimitService).clearFailures(EMAIL);
         verify(refreshTokenService).save(EMAIL, DEVICE_ID, response.getRefreshToken());
+    }
+
+    @Test
+    @DisplayName("로그인 - 대소문자 · 공백이 섞인 이메일도 정규화한 값으로 조회 · 실패 기록 초기화")
+    void login_success_with_mixed_case_and_whitespace_email_normalized() {
+
+        Member member = activeMember();
+
+        when(rateLimitService.isBlocked(EMAIL)).thenReturn(false);
+        when(memberRepository.findByEmail(EMAIL)).thenReturn(member);
+        when(passwordEncoder.matches(PASSWORD, member.getPassword())).thenReturn(true);
+
+        authService.login(RAW_MIXED_CASE_EMAIL, PASSWORD, DEVICE_ID);
+
+        verify(rateLimitService).isBlocked(EMAIL);
+        verify(memberRepository).findByEmail(EMAIL);
+        verify(rateLimitService).clearFailures(EMAIL);
+    }
+
+    @Test
+    @DisplayName("로그인 - 토큰 subject와 Refresh Token 저장 이메일은 입력값이 아니라 member.getEmail() 값")
+    void login_success_token_and_refresh_save_use_member_email_not_input() {
+
+        // member.getEmail()이 조회 키(정규화한 입력값)와 다른 표기를 반환하는 상황을 가정해,
+        // 토큰 생성 · Refresh Token 저장이 정규화한 입력값이 아니라 member.getEmail()을 쓰는지 구분해 검증
+        String storedEmail = "stored@test.com";
+        Member member = mock(Member.class);
+        when(member.getIsWithdrawn()).thenReturn(false);
+        when(member.getPassword()).thenReturn("encoded-password");
+        when(member.getRole()).thenReturn(Member.Role.CUSTOMER);
+        when(member.getNickname()).thenReturn("tester");
+        when(member.getEmail()).thenReturn(storedEmail);
+
+        when(rateLimitService.isBlocked(EMAIL)).thenReturn(false);
+        when(memberRepository.findByEmail(EMAIL)).thenReturn(member);
+        when(passwordEncoder.matches(PASSWORD, member.getPassword())).thenReturn(true);
+
+        LoginResponse response = authService.login(RAW_MIXED_CASE_EMAIL, PASSWORD, DEVICE_ID);
+
+        assertThat(jwtProvider.getEmailFromToken(response.getAccessToken())).isEqualTo(storedEmail);
+        verify(refreshTokenService).save(storedEmail, DEVICE_ID, response.getRefreshToken());
+    }
+
+    @Test
+    @DisplayName("로그인 - 정규화한 키로 차단된 상태면 대소문자만 바꾼 이메일도 TooManyRequestsException, 회원 조회 미호출")
+    void login_blocked_by_normalized_key_with_different_case_rejected() {
+
+        when(rateLimitService.isBlocked(EMAIL)).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login(RAW_MIXED_CASE_EMAIL, PASSWORD, DEVICE_ID))
+                .isInstanceOf(TooManyRequestsException.class)
+                .hasMessage("로그인 시도 횟수가 초과되었습니다.");
+
+        verify(memberRepository, never()).findByEmail(any());
+    }
+
+    @Test
+    @DisplayName("로그인 - 대소문자가 섞인 이메일 + 비밀번호 불일치는 정규화한 값으로 실패 기록")
+    void login_wrong_password_with_mixed_case_email_records_failure_normalized() {
+
+        Member member = activeMember();
+
+        when(rateLimitService.isBlocked(EMAIL)).thenReturn(false);
+        when(memberRepository.findByEmail(EMAIL)).thenReturn(member);
+        when(passwordEncoder.matches(PASSWORD, member.getPassword())).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(RAW_MIXED_CASE_EMAIL, PASSWORD, DEVICE_ID))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage(LOGIN_FAILED_MESSAGE);
+
+        verify(rateLimitService).recordFailure(EMAIL);
     }
 
     @Test
