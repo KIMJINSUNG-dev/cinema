@@ -4,6 +4,7 @@
  * -2026-09-10: 파일 생성 및 작성
  * -2026-09-15: updateNickname(), updateIsWithdrawn() 메서드에
  *              요청 주체와 update 대상이 일치하는지 검증 추가
+ * -2026-11-24: 이메일 정규화 메서드 적용, 닉네임 중복검사 메서드 추가 및 적용
  ***/
 package com.cinema.backend.domain.member;
 
@@ -15,6 +16,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import static com.cinema.backend.domain.member.Member.normalizeEmail;
 
 @Service
 @RequiredArgsConstructor
@@ -30,22 +33,21 @@ public class MemberService {
             String nickname) {
 
         Member member = new Member();
+        email = normalizeEmail(email);
 
         if (memberRepository.findByEmail(email) != null) {
 
             throw new IllegalArgumentException("이미 사용중인 이메일입니다.");
         }
 
-        if (memberRepository.findByNickname(nickname) != null) {
-
-            throw new IllegalArgumentException("이미 사용중인 닉네임입니다.");
-        }
-
+        validateNicknameAvailable(nickname, null);
         member.updateEmail(email);
+
         if (password == null || password.isBlank()) {
 
             throw new IllegalArgumentException("비밀번호는 비워둘 수 없습니다.");
         }
+
         member.updatePassword(passwordEncoder.encode(password));
         member.updateNickname(nickname);
         memberRepository.save(member);
@@ -72,6 +74,7 @@ public class MemberService {
     @Transactional(readOnly = true)
     public MemberResponse findByEmail(String email) {
 
+        email = normalizeEmail(email);
         Member member = memberRepository.findByEmail(email);
         if (member == null) throw new IllegalArgumentException("존재하지 않는 회원입니다.");
 
@@ -97,6 +100,8 @@ public class MemberService {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
 
+        validateNicknameAvailable(nickname, id);
+
         member.updateNickname(nickname);
         member.updateRole(role);
         member.updateIsWithdrawn(isWithdrawn);
@@ -114,6 +119,8 @@ public class MemberService {
 
             throw new AccessDeniedException("권한이 없습니다.");
         }
+
+        validateNicknameAvailable(nickname, id);
 
         member.updateNickname(nickname);
 
@@ -134,5 +141,21 @@ public class MemberService {
         member.updateIsWithdrawn(isWithdrawn);
 
         return new MemberResponse(member);
+    }
+
+    private void validateNicknameAvailable(String nickname, Long selfId) {
+
+        if (nickname == null || nickname.isBlank()) {
+
+            return;
+        }
+
+        nickname = nickname.trim();
+        Member existing = memberRepository.findByNickname(nickname);
+
+        if (existing != null && !existing.getId().equals(selfId)) {
+
+            throw new IllegalArgumentException("이미 사용중인 닉네임입니다.");
+        }
     }
 }

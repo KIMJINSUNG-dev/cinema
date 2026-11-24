@@ -6,6 +6,8 @@
  * -2026-09-10: 외부 접근 허용 메서드의 enum 파라미터를 String 기반으로 교체, 탈퇴여부 필드 추가
  * -2026-10-08: 외부에서 기본 생성자로 빈 엔티티를 생성하지 못하도록 @NoArgsConstructor를 protected로 제한
  * -2026-10-25: 사용자 등급 체계에 대한 의사 결정에 따른 등급별 권한에 대한 주석 내용 보완
+ * -2026-11-24: 이메일 정규화 static 메서드 추가 및 updateEmail()에 적용
+ *              updateNickname() 메서드의 nickname 값에 trim() 적용
  ***/
 package com.cinema.backend.domain.member;
 
@@ -14,6 +16,8 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.util.Locale;
 
 @Entity
 @Table(name = "members")
@@ -66,7 +70,7 @@ public class Member extends BaseEntity {
 
             throw new IllegalArgumentException("이메일은 비워둘 수 없습니다.");
         }
-        this.email = email;
+        this.email = normalizeEmail(email);
     }
 
     public void updatePassword(String password) {
@@ -84,7 +88,7 @@ public class Member extends BaseEntity {
 
             throw new IllegalArgumentException("닉네임은 비워둘 수 없습니다.");
         }
-        this.nickname = nickname;
+        this.nickname = nickname.trim();
     }
 
     public void updateRole(String role) {
@@ -119,5 +123,10 @@ public class Member extends BaseEntity {
             throw new IllegalArgumentException("회원탈퇴 여부는 비워둘 수 없습니다.");
         }
         this.isWithdrawn = isWithdrawn;
+    }
+
+    public static String normalizeEmail(String email) {
+
+        return (email == null) ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 }

@@ -3,6 +3,7 @@
  * 작성이력
  * -2026-09-11: 파일 생성 및 작성
  * -2026-11-09: 예외 처리 방식을 TooManyRequestsException / UnauthorizedException 기반으로 변경
+ * -2026-11-24: login() 메서드의 이메일 부분 중 필요한 부분에 이메일 정규화 메서드 적용
  ***/
 package com.cinema.backend.domain.auth;
 
@@ -21,6 +22,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import static com.cinema.backend.domain.member.Member.normalizeEmail;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -37,12 +40,13 @@ public class AuthService {
     @Transactional
     public LoginResponse login(String email, String password, String deviceId) {
 
-        if (rateLimitService.isBlocked(email)) {
+        String normalizedEmail = normalizeEmail(email);
+        if (rateLimitService.isBlocked(normalizedEmail)) {
 
             throw new TooManyRequestsException("로그인 시도 횟수가 초과되었습니다.");
         }
 
-        Member member = memberRepository.findByEmail(email);
+        Member member = memberRepository.findByEmail(normalizedEmail);
 
         if (member == null || member.getIsWithdrawn()) {
 
@@ -51,15 +55,15 @@ public class AuthService {
 
         if (!passwordEncoder.matches(password, member.getPassword())) {
 
-            rateLimitService.recordFailure(email);
+            rateLimitService.recordFailure(normalizedEmail);
             throw new UnauthorizedException("아이디 또는 비밀번호가 맞지 않습니다.");
         }
 
-        rateLimitService.clearFailures(email);
-        String accessToken = jwtProvider.generateAccessToken(email, member.getRole().name());
-        String refreshToken = jwtProvider.generateRefreshToken(email);
+        rateLimitService.clearFailures(normalizedEmail);
+        String accessToken = jwtProvider.generateAccessToken(member.getEmail(), member.getRole().name());
+        String refreshToken = jwtProvider.generateRefreshToken(member.getEmail());
 
-        refreshTokenService.save(email, deviceId, refreshToken);
+        refreshTokenService.save(member.getEmail(), deviceId, refreshToken);
         return new LoginResponse(accessToken, refreshToken, member.getNickname());
     }
 
